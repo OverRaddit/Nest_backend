@@ -1,10 +1,11 @@
 import { NestFactory } from '@nestjs/core';
 import { IoAdapter } from '@nestjs/platform-socket.io';
 import { AppModule } from './app.module';
-import { EventsModule } from './events/events.module';
+import { config } from 'dotenv';
 
 async function bootstrap() {
-  const app = await NestFactory.create(EventsModule);
+  config();
+  const app = await NestFactory.create(AppModule);
   app.useWebSocketAdapter(new IoAdapter(app));
   await app.listen(3000);
 }

@@ -32,6 +32,16 @@
 $ npm install
 ```
 
+## Insert Env file
+
+```
+PLAYLIST_ID = YOUR_YOUTUBE_PLAYLIST_ID
+YOUTUBE_KEY = YOUR_YOUTUBE_API_KEY
+CLIENT_ID = YOUR_42_CLIENT_ID
+CLIENT_SECRET = YOUR_42_SECRET
+CALLBACK_URL = http://localhost:3000/auth/redirect
+```
+
 ## Running the app
 
 ```bash
