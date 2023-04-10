@@ -77,9 +77,10 @@ export class EventsGateway
   // socket을 특정 room에 join 시킵니다.
   @SubscribeMessage('join')
   async handleJoin(@ConnectedSocket() client, @MessageBody() data) {
+    console.log(this.server.sockets.adapter.rooms);
+    client.join('gshim');
     const gshimNum = this.server.sockets.adapter.rooms.get('gshim').size;
     console.log('clientId: ', client.id, 'join to room gshim');
-    client.join('gshim');
     console.log(
       `현재 게임룸 현황(${gshimNum}): ${this.server.sockets.adapter.rooms.get(
         'gshim',
