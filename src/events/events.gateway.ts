@@ -186,7 +186,8 @@ export class EventsGateway
   async handleJoin(@ConnectedSocket() client, @MessageBody() data) {
     client.join('gshim');
     const gshimNum = this.server.sockets.adapter.rooms.get('gshim').size;
-    
+    console.log('clientId: ', client.id, 'join to room gshim');
+    client.join('gshim');
     console.log(
       `현재 게임룸 현황(${gshimNum}): ${this.server.sockets.adapter.rooms.get(
         'gshim',
