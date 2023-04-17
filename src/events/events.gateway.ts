@@ -68,15 +68,15 @@ export class EventsGateway
   // private isMoveUp2: boolean;
   // private isMoveDown2: boolean;
 
-  private canvasW = 300;
-  private canvasH = 150;
-  private moveValue = 4;
+  private canvasW = 1000;
+  private canvasH = 1000;
+  private moveValue = 8;
   // add
   private ball: BallObject = {
     x: this.canvasW / 2,
     y: this.canvasH / 2,
     radius: 10,
-    speed: 5,
+    speed: 30,
     velocityX: 5,
     velocityY: 5,
   };
@@ -100,10 +100,10 @@ export class EventsGateway
 
 
   resetBall(){
-    this.ball.x = this.canvasW / 2;
-    this.ball.y = this.canvasH/2;
+    this.ball.x = this.canvasW / 2 + 10;
+    this.ball.y = this.canvasH / 2;
 
-    this.ball.speed = 5;
+    this.ball.speed = 100;
     this.ball.velocityX = -this.ball.velocityX; 
   }
 
@@ -131,7 +131,7 @@ export class EventsGateway
       }
 
       // update paddle
-      console.log(this.leftUser.y, this.rightUser.y)
+    //   console.log(this.leftUser.y, this.rightUser.y)
       if (this.leftUser.state == 1){
         console.log("up");
         this.leftUser.y = Math.max(this.leftUser.y - this.moveValue, 0);
@@ -152,10 +152,12 @@ export class EventsGateway
       if (this.ball.x - this.ball.radius < 0)
       {
         this.rightUser.score++;
+		this.isGameOver(this.leftUser.score, this.rightUser.score);
         this.resetBall();
       } 
       else if (this.ball.x + this.ball.radius > this.canvasW){
         this.leftUser.score++;
+		this.isGameOver(this.leftUser.score, this.rightUser.score);
         this.resetBall();
       }
 
@@ -247,5 +249,60 @@ export class EventsGateway
     }
     else if (isLeftPlayer == 2) 
       this.rightUser.state = x;
+  }
+
+  isGameOver(leftScore : number, rightScore : number)
+  {
+	if (leftScore >= 5){
+		this.server.to('gshim').emit('gameover', 1);
+		console.log("game end 1p");
+		this.ball.x = this.canvasW / 2 - 10;
+		this.ball.y = this.canvasH / 2;
+		this.ball.radius = 10;
+		this.ball.speed = 0;
+		this.ball.velocityX = 0;
+		this.ball.velocityY = 0;
+		
+		
+		// this.leftUser.x = 0;
+		// this.leftUser.y = 0;
+		// this.leftUser.width = 0;
+		// this.leftUser.height = 0;
+		// this.leftUser.score = 0;
+		// this.leftUser.state = 0;
+		
+		// this.rightUser.x = 0;
+		// this.rightUser.y = 0;
+		// this.rightUser.width = 0;
+		// this.rightUser.height = 0;
+		// this.rightUser.score = 0;
+		// this.rightUser.state = 0;
+
+	}
+	else if (rightScore >= 5){
+		this.server.to('gshim').emit('gameover', 2);
+		console.log("game end 2p");
+		this.ball.x = this.canvasW / 2;
+		this.ball.y = this.canvasH / 2;
+		this.ball.radius = 10;
+		this.ball.speed = 0;
+		this.ball.velocityX = 0;
+		this.ball.velocityY = 0;
+		
+		
+		// this.leftUser.x = 0;
+		// this.leftUser.y = 0;
+		// this.leftUser.width = 0;
+		// this.leftUser.height = 0;
+		// this.leftUser.score = 0;
+		// this.leftUser.state = 0;
+		
+		// this.rightUser.x = 0;
+		// this.rightUser.y = 0;
+		// this.rightUser.width = 0;
+		// this.rightUser.height = 0;
+		// this.rightUser.score = 0;
+		// this.rightUser.state = 0;
+	}
   }
 }
