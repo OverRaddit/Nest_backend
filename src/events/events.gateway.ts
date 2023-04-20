@@ -44,6 +44,7 @@ export class EventsGateway
   private gameRoom = {};
   private sock = {};
 
+
   // socketIO server가 처음 켜질(init)될때 동작하는 함수 - OnGatewayInit 짝궁
   // setTimeout(() => console.log("after"), 3000);
 
@@ -133,11 +134,14 @@ export class EventsGateway
       // update the score
       if (data.ball.x - data.ball.radius < 0)
       {
+
         data.right.score++;
+        // this.isGameOver(this.leftUser.score, this.rightUser.score);
         data.ball = resetBall(data.ball, this.canvasW, this.canvasH);
       } 
       else if (data.ball.x + data.ball.radius > this.canvasW){
         data.left.score++;
+        // this.isGameOver(this.leftUser.score, this.rightUser.score);
         data.ball = resetBall(data.ball, this.canvasW, this.canvasH);
       }
 
@@ -338,6 +342,61 @@ export class EventsGateway
       console.log("matching 완료");
       this.startGame(roomName);
     }
+  }
+
+  isGameOver(leftScore : number, rightScore : number)
+  {
+	if (leftScore >= 5){
+		this.server.to('gshim').emit('gameover', 1);
+		console.log("game end 1p");
+		this.ball.x = this.canvasW / 2 - 10;
+		this.ball.y = this.canvasH / 2;
+		this.ball.radius = 10;
+		this.ball.speed = 0;
+		this.ball.velocityX = 0;
+		this.ball.velocityY = 0;
+		
+		
+		// this.leftUser.x = 0;
+		// this.leftUser.y = 0;
+		// this.leftUser.width = 0;
+		// this.leftUser.height = 0;
+		// this.leftUser.score = 0;
+		// this.leftUser.state = 0;
+		
+		// this.rightUser.x = 0;
+		// this.rightUser.y = 0;
+		// this.rightUser.width = 0;
+		// this.rightUser.height = 0;
+		// this.rightUser.score = 0;
+		// this.rightUser.state = 0;
+
+	}
+	else if (rightScore >= 5){
+		this.server.to('gshim').emit('gameover', 2);
+		console.log("game end 2p");
+		this.ball.x = this.canvasW / 2;
+		this.ball.y = this.canvasH / 2;
+		this.ball.radius = 10;
+		this.ball.speed = 0;
+		this.ball.velocityX = 0;
+		this.ball.velocityY = 0;
+		
+		
+		// this.leftUser.x = 0;
+		// this.leftUser.y = 0;
+		// this.leftUser.width = 0;
+		// this.leftUser.height = 0;
+		// this.leftUser.score = 0;
+		// this.leftUser.state = 0;
+		
+		// this.rightUser.x = 0;
+		// this.rightUser.y = 0;
+		// this.rightUser.width = 0;
+		// this.rightUser.height = 0;
+		// this.rightUser.score = 0;
+		// this.rightUser.state = 0;
+	}
   }
 }
 
