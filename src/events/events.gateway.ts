@@ -8,40 +8,10 @@ import {
   WebSocketGateway,
   WebSocketServer,
 } from '@nestjs/websockets';
+import { randomBytes } from 'crypto';
+import { join } from 'path';
 import { Server, Socket } from 'socket.io';
-
-type BallObject = {
-  x: number,
-  y: number,
-  radius: number,
-  speed : number,
-  velocityX : number,
-  velocityY : number,
-}
-
-type Player = {
-  x: number,
-  y: number,
-  width : number,
-  height: number,
-  score: number,
-  state: number
-}
-
-  function collision(b, p)
-    {
-      b.top = b.y - b.radius;
-      b.bottom = b.y + b.radius;
-      b.left = b.x - b.radius;
-      b.right = b.x + b.radius;
-
-      p.top = p.y;
-      p.bottom = p.y + p.height;
-      p.left = p.x;
-      p.right = p.x + p.width;
-      return b.right > p.left && b.bottom > p.top && 
-              b.left < p.right && b.top < p.bottom;
-    }
+import { GameData, BallObject, PlayerObject, QueueData, createBallObject, createLeftPlayerObject, createRightPlayerObject, createGameData } from './game.interface';
 
 // 이 설정들이 뭘하는건지, 애초에 무슨 레포를 보고 이것들을 찾을 수 있는지 전혀 모르겠다.
 @WebSocketGateway(8000, {
@@ -60,111 +30,134 @@ export class EventsGateway
   server: Server;
 
   private intervalId: NodeJS.Timeout;
-  // 게임 데이터.
-  // private pos1: number;
-  // private pos2: number;
-  // private isMoveUp1: boolean;
-  // private isMoveDown1: boolean;
-  // private isMoveUp2: boolean;
-  // private isMoveDown2: boolean;
-
-  private canvasW = 300;
-  private canvasH = 150;
+  private canvasW = 600;
+  private canvasH = 400;
   private moveValue = 4;
   // add
-  private ball: BallObject = {
-    x: this.canvasW / 2,
-    y: this.canvasH / 2,
-    radius: 10,
-    speed: 5,
-    velocityX: 5,
-    velocityY: 5,
-  };
+  private ball: BallObject = createBallObject();
 
-  private leftUser: Player = {
-    x:0,
-    y:this.canvasH / 2 - 100 / 2,
-    width : 10,
-    height: 100,
-    score:0,
-    state:0
-  };
-  private rightUser: Player = {
-    x:this.canvasW,
-    y:this.canvasH / 2 - 100 / 2,
-    width : 10,
-    height: 100,
-    score:0,
-    state:0
-  };
+  private leftUser: PlayerObject = createLeftPlayerObject
+  (0, this.canvasH / 2 - 100 / 2, 10, 100, 0, 0);
+  private rightUser: PlayerObject = createRightPlayerObject
+  (this.canvasW - 10,this.canvasH / 2 - 100 / 2, 10, 100,0,0);
 
-
-  resetBall(){
-    this.ball.x = this.canvasW / 2;
-    this.ball.y = this.canvasH/2;
-
-    this.ball.speed = 5;
-    this.ball.velocityX = -this.ball.velocityX; 
-  }
+  private gameRoom = {};
+  private sock = {};
 
   // socketIO server가 처음 켜질(init)될때 동작하는 함수 - OnGatewayInit 짝궁
-  afterInit(server: Server) {
-    console.log('WebSocketGateway initialized');
-    // 현재 게임데이터 pos1, pos2를 'gshim' room의 참가자들에게 1초에 10번씩 무한으로 전달하는 함수
-    this.intervalId = setInterval(() => {
-      this.ball.x += this.ball.velocityX;
-      this.ball.y += this.ball.velocityY;
+  // setTimeout(() => console.log("after"), 3000);
 
-      let player = (this.ball.x < this.canvasW / 2) ? this.leftUser : this.rightUser;
+  //startGame이 시작된다면
 
-      if (collision(this.ball, player))
+  private GameObject = {
+    left: this.leftUser,
+    right: this.rightUser,
+    ball: this.ball
+  }
+
+  startGame(roomId: string) {
+    console.log(roomId);
+    function collision(b, p)
+    {
+      b.top = b.y - b.radius;
+      b.bottom = b.y + b.radius;
+      b.left = b.x - b.radius;
+      b.right = b.x + b.radius;
+
+      p.top = p.y;
+      p.bottom = p.y + p.height;
+      p.left = p.x;
+      p.right = p.x + p.width;
+      return b.right > p.left && b.bottom > p.top && 
+              b.left < p.right && b.top < p.bottom;
+    }
+
+    function resetBall(ball, w, h) {
+      // console.log(ball, w,h);
+      ball.x = w / 2;
+      ball.y = h / 2;
+  
+      ball.speed = 5;
+      ball.velocityX = ball.velocityX; 
+      return ball;
+    }
+    const setId = setInterval(() => {
+      const data = this.gameRoom[roomId];
+      
+
+      // 40ms마다 실행되는 로직 작성
+
+      data.ball.x += data.ball.velocityX;
+      data.ball.y += data.ball.velocityY;
+  
+      if (data.ball.y + data.ball.radius > this.canvasH ||
+        data.ball.y - data.ball.radius < 0) {
+        data.ball.velocityY = -data.ball.velocityY;
+      }
+      // console.log(data.left, data.right);
+      let player = (data.ball.x < this.canvasW / 2) ? data.left : data.right;
+      // console.log(data.ball.x, data.ball.y, player.x, player.y);
+      if (collision(data.ball, player))
       {
-        let collidePoint = this.ball.y - (player.y + player.height / 2);
+        let collidePoint = data.ball.y - (player.y + player.height / 2);
         collidePoint = collidePoint / (player.height / 2);
 
         let angleRad = collidePoint * Math.PI / 4;
-        let direction = (this.ball.x < this.canvasW /  2) ? 1 : -1;
-        this.ball.velocityX = direction *  this.ball.speed * Math.cos(angleRad);
-        this.ball.velocityY =              this.ball.speed * Math.sin(angleRad);
+        let direction = (data.ball.x < this.canvasW /  2) ? 1 : -1;
+        data.ball.velocityX = direction *  data.ball.speed * Math.cos(angleRad);
+        data.ball.velocityY =              data.ball.speed * Math.sin(angleRad);
 
-        this.ball.speed += 0.1;
+        data.ball.speed += 0.1;
       }
 
       // update paddle
-      console.log(this.leftUser.y, this.rightUser.y)
-      if (this.leftUser.state == 1){
-        console.log("up");
-        this.leftUser.y = Math.max(this.leftUser.y - this.moveValue, 0);
+      console.log(data.left.state, data.right.state)
+      if (data.left.state == 1) {
+        data.left.y = Math.max(data.left.y - this.moveValue, 0);
+        console.log(data.left.y, data.left.x, data.right.y, data.right.x)
       }
-      else if (this.leftUser.state == 2){
-        console.log("down", this.leftUser.y + this.moveValue, this.canvasH - this.leftUser.height, this.leftUser.y);
-        this.leftUser.y = Math.min(this.leftUser.y + this.moveValue, this.canvasH - this.leftUser.height);
-        console.log("after", this.leftUser.y + this.moveValue, this.canvasH - this.leftUser.height, this.leftUser.y);
+      else if (data.left.state == 2) {
+        data.left.y = Math.min(data.left.y + this.moveValue, this.canvasH - data.left.height);
+        console.log(data.left.y, data.left.x, data.right.y, data.right.x)
       }
-      if (this.rightUser.state == 1){
-        this.rightUser.y = Math.max(this.rightUser.y - this.moveValue, 0);
+      if (data.right.state == 1) {
+        data.right.y = Math.max(data.right.y - this.moveValue, 0);
+        console.log(data.left.y, data.left.x, data.right.y, data.right.x)
       }
-      else if (this.rightUser.state == 2){
-        this.rightUser.y = Math.min(this.rightUser.y + this.moveValue, this.canvasH - this.rightUser.height);
+      else if (data.right.state == 2) {
+        data.right.y = Math.min(data.right.y + this.moveValue, this.canvasH - data.right.height);
+        console.log(data.left.y, data.left.x, data.right.y, data.right.x)
       }
+      
 
       // update the score
-      if (this.ball.x - this.ball.radius < 0)
+      if (data.ball.x - data.ball.radius < 0)
       {
-        this.rightUser.score++;
-        this.resetBall();
+        data.right.score++;
+        data.ball = resetBall(data.ball, this.canvasW, this.canvasH);
       } 
-      else if (this.ball.x + this.ball.radius > this.canvasW){
-        this.leftUser.score++;
-        this.resetBall();
+      else if (data.ball.x + data.ball.radius > this.canvasW){
+        data.left.score++;
+        data.ball = resetBall(data.ball, this.canvasW, this.canvasH);
       }
 
-      this.server.to('gshim').emit('render', this.leftUser, this.rightUser, this.ball);
-    }, 40); // send the event every 20ms (50 times per second)
+      this.server.to(roomId).emit('render', data.left, data.right, data.ball, roomId);
+      // 40ms마다 실행되는 로직 작성
+      // ex) 게임 프레임 처리
+    }, 1000);
+  }
+
+  afterInit(server: Server) {
+      
+
+    console.log('WebSocketGateway initialized');
+    
   }
 
   // 연결된 socket이 연결될때 동작하는 함수 - OnGatewayConnection 짝궁
   handleConnection(client: any, ...args: any[]) {
+
+    // console.log("testsetsetset");
     console.log(`Client connected: ${client.id}`);
   }
 
@@ -173,6 +166,7 @@ export class EventsGateway
     console.log('WebSocketGateway disconnected');
   }
 
+  /*
   // socket의 메시지를 room내부의 모든 이들에게 전달합니다.
   @SubscribeMessage('chat')
   async handleChat(@ConnectedSocket() client, @MessageBody() data) {
@@ -187,7 +181,6 @@ export class EventsGateway
     client.join('gshim');
     const gshimNum = this.server.sockets.adapter.rooms.get('gshim').size;
     console.log('clientId: ', client.id, 'join to room gshim');
-    client.join('gshim');
     console.log(
       `현재 게임룸 현황(${gshimNum}): ${this.server.sockets.adapter.rooms.get(
         'gshim',
@@ -195,57 +188,213 @@ export class EventsGateway
     );
     // join한 socket에게 본인이 왼쪽플레이어인지 오른쪽플레이어인지 알려준다.
     this.server.to(client.id).emit('isLeft', gshimNum); // TODO
-  }
+  }*/
 
   // 여기서부터 게임이벤트 =====================================
   @SubscribeMessage('handleKeyPressUp')
   async handleKeyPressUp(
     @ConnectedSocket() client,
-    @MessageBody() isLeftPlayer,
+    @MessageBody() message,
   ) {
-    // console.log(`${isLeftPlayer}가 up키를 눌렸습니다.`);
-    this.setIsMovingUp(isLeftPlayer, 1);
+    const [room, id] = message;
+    if (id === 1)
+    {
+      this.gameRoom[room].left.state = 1;
+      console.log(this.gameRoom[room].left);
+    }
+    else if (id === 2)
+    {
+      this.gameRoom[room].right.state = 1;
+      console.log(this.gameRoom[room].left);
+    }
+    
   }
 
   @SubscribeMessage('handleKeyPressDown')
   async handleKeyPressDown(
     @ConnectedSocket() client,
-    @MessageBody() isLeftPlayer,
+    @MessageBody() data
   ) {
-    // console.log(`${isLeftPlayer}가 down키를 눌렸습니다.`);
-    this.setIsMovingDown(isLeftPlayer, 2);
+    const [room, id] = data;
+    // console.log(client.id);
+    console.log(room, id);
+    // console.log(this.gameRoom[room]);
+    if (id === 1)
+    {
+      this.gameRoom[room].left.state = 2;
+      console.log(this.gameRoom[room].left);
+    }
+    else if (id === 2)
+    {
+      this.gameRoom[room].right.state = 2;
+      console.log(this.gameRoom[room].left);
+    }
   }
 
   @SubscribeMessage('handleKeyRelUp')
-  async handleKeyRelUp(@ConnectedSocket() client, @MessageBody() isLeftPlayer) {
+  async handleKeyRelUp(@ConnectedSocket() client, 
+    @MessageBody() message) {
     // console.log(`${isLeftPlayer}가 up키를 떼었습니다.`);
-    this.setIsMovingUp(isLeftPlayer, 0);
+    const [room, id] = message;
+    if (id === 1)
+    {
+      this.gameRoom[room].left.state = 0;
+      console.log(this.gameRoom[room].left);
+    }
+    else if (id === 2)
+    {
+      this.gameRoom[room].right.state = 0;
+      console.log(this.gameRoom[room].left);
+    }
   }
 
   @SubscribeMessage('handleKeyRelDown')
   async handleKeyRelDown(
     @ConnectedSocket() client,
-    @MessageBody() isLeftPlayer,
+    @MessageBody() message,
   ) {
-    // console.log(`${isLeftPlayer}가 down키를 떼었습니다.`);
-    this.setIsMovingDown(isLeftPlayer, 0);
-  }
+    const [room, id] = message;
+    if (id === 1)
+    {
+      this.gameRoom[room].left.state = 0;
+      console.log(this.gameRoom[room].left);
+    }
+    else if (id === 2)
+    {
+      this.gameRoom[room].right.state = 0;
+      console.log(this.gameRoom[room].left);
+    }
 
-  // 왼/오른쪽 플레이어가 위로 움직이는 중인지 여부를 저장하는 함수
-  setIsMovingUp(isLeftPlayer, x: number) {
-    if (isLeftPlayer == 1) {
-      this.leftUser.state = x;
-    }
-    else if (isLeftPlayer == 2){
-      this.rightUser.state = x;
-    }
   }
-  // 왼/오른쪽 플레이어가 아래로 움직이는 중인지 여부를 저장하는 함수
-  setIsMovingDown(isLeftPlayer, x: number) {
-    if (isLeftPlayer == 1){
-      this.leftUser.state = x;
+  
+  private matchNormalQueue = [];
+  private matchExtendQueue = [];
+
+  // socket의 메시지를 room내부의 모든 이들에게 전달합니다.
+  @SubscribeMessage('match')
+  async enqueueMatch(@ConnectedSocket() client, @MessageBody() data) {
+    // console.log("socket:", client);
+    console.log("data:", data);
+        
+    const queueData = {
+      socket: client,
+      gameType: data
+    };
+
+    // type에 따라 큐 넣기
+    if (data === false) {
+      this.matchNormalQueue.push(queueData);
     }
-    else if (isLeftPlayer == 2) 
-      this.rightUser.state = x;
+    else {
+      this.matchExtendQueue.push(queueData);
+    }
+
+    this.server.to(client.id).emit('enqueuecomplete', 200);
+
+    if (this.matchNormalQueue.length >= 2) {
+      const left = this.matchNormalQueue.shift();
+      const right = this.matchNormalQueue.shift();
+      
+      const roomName = randomBytes(10).toString('hex');
+      console.log("room Name:", roomName);
+      this.sock[left.socket.id] = roomName;
+      this.sock[right.socket.id] = roomName;
+      
+      // before
+      console.log('speed: ', this.GameObject.ball.speed);
+      
+      const newGameObject: GameData = createGameData(
+        createLeftPlayerObject(),
+        createRightPlayerObject(),
+        createBallObject(),
+      );
+      
+      // {
+      //   left: this.GameObject.left,
+      //   right: this.GameObject.right,
+      //   ball: this.GameObject.ball,
+      // };
+
+      // copy gamedata
+      // newGameObject.ball = this.GameObject.ball;
+      // newGameObject.left = this.GameObject.left;
+      // newGameObject.right = this.GameObject.right;
+
+
+      newGameObject.ball.speed = 42;
+
+      console.log('speed: ', this.GameObject.ball.speed);
+
+      this.gameRoom[roomName] = newGameObject;
+      console.log('gameRoom: ', this.gameRoom);
+      console.log('gameRoom[roomName]: ', this.gameRoom[roomName]);
+      // TODO roomname 필요
+      left.socket.join(roomName); // TODO
+      right.socket.join(roomName); // TODO
+      this.server.to(left.socket.id).emit('isLeft', 1);
+      this.server.to(right.socket.id).emit('isLeft', 2);
+      this.server.to(roomName).emit('matchingcomplete', 200, roomName);
+
+      console.log("matching 완료");
+      this.startGame(roomName);
+    }
   }
 }
+
+// ------------
+
+
+// this.intervalId = setInterval(() => {
+      //   this.ball.x += this.ball.velocityX;
+      //   this.ball.y += this.ball.velocityY;
+  
+      //   if (this.ball.y + this.ball.radius > this.canvasH ||
+      //     this.ball.y - this.ball.radius < 0) {
+      //     this.ball.velocityY = -this.ball.velocityY;
+      //   }
+        
+      //   let player = (this.ball.x < this.canvasW / 2) ? this.leftUser : this.rightUser;
+      //   // console.log(this.ball.x, this.ball.y, player.x, player.y);
+      //   if (collision(this.ball, player))
+      //   {
+      //     let collidePoint = this.ball.y - (player.y + player.height / 2);
+      //     collidePoint = collidePoint / (player.height / 2);
+  
+      //     let angleRad = collidePoint * Math.PI / 4;
+      //     let direction = (this.ball.x < this.canvasW /  2) ? 1 : -1;
+      //     this.ball.velocityX = direction *  this.ball.speed * Math.cos(angleRad);
+      //     this.ball.velocityY =              this.ball.speed * Math.sin(angleRad);
+  
+      //     this.ball.speed += 0.1;
+      //   }
+  
+      //   // update paddle
+      //   // console.log(this.leftUser.y, this.rightUser.y)
+      //   if (this.leftUser.state == 1){
+      //     this.leftUser.y = Math.max(this.leftUser.y - this.moveValue, 0);
+      //   }
+      //   else if (this.leftUser.state == 2){
+      //     this.leftUser.y = Math.min(this.leftUser.y + this.moveValue, this.canvasH - this.leftUser.height);
+      //   }
+      //   if (this.rightUser.state == 1){
+      //     this.rightUser.y = Math.max(this.rightUser.y - this.moveValue, 0);
+      //   }
+      //   else if (this.rightUser.state == 2){
+      //     this.rightUser.y = Math.min(this.rightUser.y + this.moveValue, this.canvasH - this.rightUser.height);
+      //   }
+  
+        
+        
+      //   // update the score
+      //   if (this.ball.x - this.ball.radius < 0)
+      //   {
+      //     this.rightUser.score++;
+      //     this.resetBall();
+      //   } 
+      //   else if (this.ball.x + this.ball.radius > this.canvasW){
+      //     this.leftUser.score++;
+      //     this.resetBall();
+      //   }
+  
+      //   this.server.to('gshim').emit('render', this.leftUser, this.rightUser, this.ball);
+      // },20);
