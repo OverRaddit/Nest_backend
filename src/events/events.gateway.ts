@@ -29,7 +29,7 @@ export class EventsGateway
   @WebSocketServer()
   server: Server;
 
-  private intervalId: NodeJS.Timeout;
+  // private intervalId: NodeJS.Timeout;
   private canvasW = 600;
   private canvasH = 400;
   private moveValue = 4;
@@ -42,7 +42,9 @@ export class EventsGateway
   (this.canvasW - 10,this.canvasH / 2 - 100 / 2, 10, 100,0,0);
 
   private gameRoom = {};
-  private sock = {};
+  // private sock = {};
+
+  private intervalIds = {};
 
 
   // socketIO server가 처음 켜질(init)될때 동작하는 함수 - OnGatewayInit 짝궁
@@ -134,21 +136,22 @@ export class EventsGateway
       // update the score
       if (data.ball.x - data.ball.radius < 0)
       {
-
         data.right.score++;
-        // this.isGameOver(this.leftUser.score, this.rightUser.score);
+        this.isGameOver(data.left.score, data.right.score, roomId);
         data.ball = resetBall(data.ball, this.canvasW, this.canvasH);
       } 
       else if (data.ball.x + data.ball.radius > this.canvasW){
         data.left.score++;
-        // this.isGameOver(this.leftUser.score, this.rightUser.score);
+        this.isGameOver(data.left.score, data.right.score, roomId);
         data.ball = resetBall(data.ball, this.canvasW, this.canvasH);
       }
 
       this.server.to(roomId).emit('render', data.left, data.right, data.ball, roomId);
       // 40ms마다 실행되는 로직 작성
       // ex) 게임 프레임 처리
-    }, 1000);
+    }, 100);
+    console.log("Set Id:", setId);
+    this.intervalIds[roomId] = setId;
   }
 
   afterInit(server: Server) {
@@ -301,8 +304,8 @@ export class EventsGateway
       
       const roomName = randomBytes(10).toString('hex');
       console.log("room Name:", roomName);
-      this.sock[left.socket.id] = roomName;
-      this.sock[right.socket.id] = roomName;
+      // this.sock[left.socket.id] = roomName;
+      // this.sock[right.socket.id] = roomName;
       
       // before
       console.log('speed: ', this.GameObject.ball.speed);
@@ -312,22 +315,6 @@ export class EventsGateway
         createRightPlayerObject(),
         createBallObject(),
       );
-      
-      // {
-      //   left: this.GameObject.left,
-      //   right: this.GameObject.right,
-      //   ball: this.GameObject.ball,
-      // };
-
-      // copy gamedata
-      // newGameObject.ball = this.GameObject.ball;
-      // newGameObject.left = this.GameObject.left;
-      // newGameObject.right = this.GameObject.right;
-
-
-      newGameObject.ball.speed = 42;
-
-      console.log('speed: ', this.GameObject.ball.speed);
 
       this.gameRoom[roomName] = newGameObject;
       console.log('gameRoom: ', this.gameRoom);
@@ -344,116 +331,18 @@ export class EventsGateway
     }
   }
 
-  isGameOver(leftScore : number, rightScore : number)
+  isGameOver(leftScore : number, rightScore : number, roomName: string)
   {
-	if (leftScore >= 5){
-		this.server.to('gshim').emit('gameover', 1);
-		console.log("game end 1p");
-		this.ball.x = this.canvasW / 2 - 10;
-		this.ball.y = this.canvasH / 2;
-		this.ball.radius = 10;
-		this.ball.speed = 0;
-		this.ball.velocityX = 0;
-		this.ball.velocityY = 0;
-		
-		
-		// this.leftUser.x = 0;
-		// this.leftUser.y = 0;
-		// this.leftUser.width = 0;
-		// this.leftUser.height = 0;
-		// this.leftUser.score = 0;
-		// this.leftUser.state = 0;
-		
-		// this.rightUser.x = 0;
-		// this.rightUser.y = 0;
-		// this.rightUser.width = 0;
-		// this.rightUser.height = 0;
-		// this.rightUser.score = 0;
-		// this.rightUser.state = 0;
-
-	}
-	else if (rightScore >= 5){
-		this.server.to('gshim').emit('gameover', 2);
-		console.log("game end 2p");
-		this.ball.x = this.canvasW / 2;
-		this.ball.y = this.canvasH / 2;
-		this.ball.radius = 10;
-		this.ball.speed = 0;
-		this.ball.velocityX = 0;
-		this.ball.velocityY = 0;
-		
-		
-		// this.leftUser.x = 0;
-		// this.leftUser.y = 0;
-		// this.leftUser.width = 0;
-		// this.leftUser.height = 0;
-		// this.leftUser.score = 0;
-		// this.leftUser.state = 0;
-		
-		// this.rightUser.x = 0;
-		// this.rightUser.y = 0;
-		// this.rightUser.width = 0;
-		// this.rightUser.height = 0;
-		// this.rightUser.score = 0;
-		// this.rightUser.state = 0;
-	}
+    if (leftScore >= 5 || rightScore >= 5)
+    {
+      clearInterval(this.intervalIds[roomName]);
+      if (leftScore >= 5) {
+        this.server.to('gshim').emit('gameover', 1);
+      }
+      else if (rightScore >= 5) {
+        this.server.to('gshim').emit('gameover', 2);
+      }
+    }
+    
   }
 }
-
-// ------------
-
-
-// this.intervalId = setInterval(() => {
-      //   this.ball.x += this.ball.velocityX;
-      //   this.ball.y += this.ball.velocityY;
-  
-      //   if (this.ball.y + this.ball.radius > this.canvasH ||
-      //     this.ball.y - this.ball.radius < 0) {
-      //     this.ball.velocityY = -this.ball.velocityY;
-      //   }
-        
-      //   let player = (this.ball.x < this.canvasW / 2) ? this.leftUser : this.rightUser;
-      //   // console.log(this.ball.x, this.ball.y, player.x, player.y);
-      //   if (collision(this.ball, player))
-      //   {
-      //     let collidePoint = this.ball.y - (player.y + player.height / 2);
-      //     collidePoint = collidePoint / (player.height / 2);
-  
-      //     let angleRad = collidePoint * Math.PI / 4;
-      //     let direction = (this.ball.x < this.canvasW /  2) ? 1 : -1;
-      //     this.ball.velocityX = direction *  this.ball.speed * Math.cos(angleRad);
-      //     this.ball.velocityY =              this.ball.speed * Math.sin(angleRad);
-  
-      //     this.ball.speed += 0.1;
-      //   }
-  
-      //   // update paddle
-      //   // console.log(this.leftUser.y, this.rightUser.y)
-      //   if (this.leftUser.state == 1){
-      //     this.leftUser.y = Math.max(this.leftUser.y - this.moveValue, 0);
-      //   }
-      //   else if (this.leftUser.state == 2){
-      //     this.leftUser.y = Math.min(this.leftUser.y + this.moveValue, this.canvasH - this.leftUser.height);
-      //   }
-      //   if (this.rightUser.state == 1){
-      //     this.rightUser.y = Math.max(this.rightUser.y - this.moveValue, 0);
-      //   }
-      //   else if (this.rightUser.state == 2){
-      //     this.rightUser.y = Math.min(this.rightUser.y + this.moveValue, this.canvasH - this.rightUser.height);
-      //   }
-  
-        
-        
-      //   // update the score
-      //   if (this.ball.x - this.ball.radius < 0)
-      //   {
-      //     this.rightUser.score++;
-      //     this.resetBall();
-      //   } 
-      //   else if (this.ball.x + this.ball.radius > this.canvasW){
-      //     this.leftUser.score++;
-      //     this.resetBall();
-      //   }
-  
-      //   this.server.to('gshim').emit('render', this.leftUser, this.rightUser, this.ball);
-      // },20);
