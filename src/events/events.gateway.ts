@@ -114,22 +114,22 @@ export class EventsGateway
       }
 
       // update paddle
-      console.log(data.left.state, data.right.state)
+      // console.log(data.left.state, data.right.state)
       if (data.left.state == 1) {
         data.left.y = Math.max(data.left.y - this.moveValue, 0);
-        console.log(data.left.y, data.left.x, data.right.y, data.right.x)
+        // console.log(data.left.y, data.left.x, data.right.y, data.right.x)
       }
       else if (data.left.state == 2) {
         data.left.y = Math.min(data.left.y + this.moveValue, this.canvasH - data.left.height);
-        console.log(data.left.y, data.left.x, data.right.y, data.right.x)
+        // console.log(data.left.y, data.left.x, data.right.y, data.right.x)
       }
       if (data.right.state == 1) {
         data.right.y = Math.max(data.right.y - this.moveValue, 0);
-        console.log(data.left.y, data.left.x, data.right.y, data.right.x)
+        // console.log(data.left.y, data.left.x, data.right.y, data.right.x)
       }
       else if (data.right.state == 2) {
         data.right.y = Math.min(data.right.y + this.moveValue, this.canvasH - data.right.height);
-        console.log(data.left.y, data.left.x, data.right.y, data.right.x)
+        // console.log(data.left.y, data.left.x, data.right.y, data.right.x)
       }
       
 
@@ -212,7 +212,7 @@ export class EventsGateway
     else if (id === 2)
     {
       this.gameRoom[room].right.state = 1;
-      console.log(this.gameRoom[room].left);
+      console.log(this.gameRoom[room].right);
     }
     
   }
@@ -234,7 +234,7 @@ export class EventsGateway
     else if (id === 2)
     {
       this.gameRoom[room].right.state = 2;
-      console.log(this.gameRoom[room].left);
+      console.log(this.gameRoom[room].right);
     }
   }
 
@@ -322,9 +322,9 @@ export class EventsGateway
       // TODO roomname 필요
       left.socket.join(roomName); // TODO
       right.socket.join(roomName); // TODO
+      this.server.to(roomName).emit('matchingcomplete', 200, roomName);
       this.server.to(left.socket.id).emit('isLeft', 1);
       this.server.to(right.socket.id).emit('isLeft', 2);
-      this.server.to(roomName).emit('matchingcomplete', 200, roomName);
 
       console.log("matching 완료");
       this.startGame(roomName);
@@ -344,4 +344,14 @@ export class EventsGateway
       }
     }
   }
+
+
+  // cancel queue event
+  // param[socketId]
+
+  
+
 }
+
+// todo list
+// 1. if click cancel, delete queue list
