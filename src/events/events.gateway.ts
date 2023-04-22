@@ -41,8 +41,8 @@ export class EventsGateway
   private rightUser: PlayerObject = createRightPlayerObject
   (this.canvasW - 10,this.canvasH / 2 - 100 / 2, 10, 100,0,0);
 
-  private gameRoom = {};
-  // private sock = {};
+  private gameRoom: {[key: string]: any} = {};
+  // private sock = {sockid, socket};
 
   private intervalIds = {};
 
@@ -144,12 +144,13 @@ export class EventsGateway
         data.left.score++;
         this.isGameOver(data.left.score, data.right.score, roomId);
         data.ball = resetBall(data.ball, this.canvasW, this.canvasH);
+        console.log(data.ball);
       }
 
       this.server.to(roomId).emit('render', data.left, data.right, data.ball, roomId);
       // 40ms마다 실행되는 로직 작성
       // ex) 게임 프레임 처리
-    }, 50);
+    }, 40);
     console.log("Set Id:", setId);
     this.intervalIds[roomId] = setId;
   }
@@ -223,9 +224,7 @@ export class EventsGateway
     @MessageBody() data
   ) {
     const [room, id] = data;
-    // console.log(client.id);
     console.log(room, id);
-    // console.log(this.gameRoom[room]);
     if (id === 1)
     {
       this.gameRoom[room].left.state = 2;
@@ -271,7 +270,6 @@ export class EventsGateway
       this.gameRoom[room].right.state = 0;
       console.log(this.gameRoom[room].left);
     }
-
   }
   
   private matchNormalQueue = [];
@@ -304,8 +302,6 @@ export class EventsGateway
       
       const roomName = randomBytes(10).toString('hex');
       console.log("room Name:", roomName);
-      // this.sock[left.socket.id] = roomName;
-      // this.sock[right.socket.id] = roomName;
       
       // before
       console.log('speed: ', this.GameObject.ball.speed);
@@ -337,20 +333,58 @@ export class EventsGateway
     {
       clearInterval(this.intervalIds[roomName]);
       if (leftScore >= 5) {
+        // TODO: DB올려야 함.
+        
         this.server.to(roomName).emit('gameover', 1);
+        // console.log(this.server.sockets.adapter.rooms);
+        console.log(roomName);
+        const socketIds = this.server.sockets.adapter.rooms;
+        console.log(socketIds);
+        const test = socketIds.get(roomName);
+        console.log("test", test);
+
+        // remoteLeave
+
+        this.server.socketsLeave(roomName);
+        console.log(this.server.sockets.adapter.rooms);
+        // console.log(this.server);
+        // this.gameRoom.delete(roomName);
       }
       else if (rightScore >= 5) {
+        console.log(this.server.sockets.adapter.rooms);
+        // TODO: DB올려야 함.
+        // this.gameRoom.delete(roomName);
         this.server.to(roomName).emit('gameover', 2);
       }
     }
   }
 
-
   // cancel queue event
   // param[socketId]
+  @SubscribeMessage('cancel queue')
+  async cancelQueue(@ConnectedSocket() client, @MessageBody() data) {
+    console.log("cancel queue", client.id);
+    console.log("cancel game type", data);
 
-  
-
+    // data 정의 X
+    if (data === false)
+    {
+      for(var i = 0; i < this.matchNormalQueue.length; i++){ 
+        if (this.matchNormalQueue[i].socket === client.id) { 
+          this.matchNormalQueue.splice(i, 1); 
+          break;
+        }
+      }
+    } else{
+      for(var i = 0; i < this.matchNormalQueue.length; i++){ 
+        if (this.matchExtendQueue[i].socket === client.id) { 
+          this.matchExtendQueue.splice(i, 1); 
+          break;
+        }
+      }
+    }
+    this.server.to(client.id).emit('cancel queue complete', 200);
+  }
 }
 
 // todo list
