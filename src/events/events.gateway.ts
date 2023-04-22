@@ -149,7 +149,7 @@ export class EventsGateway
       this.server.to(roomId).emit('render', data.left, data.right, data.ball, roomId);
       // 40ms마다 실행되는 로직 작성
       // ex) 게임 프레임 처리
-    }, 100);
+    }, 50);
     console.log("Set Id:", setId);
     this.intervalIds[roomId] = setId;
   }
@@ -337,12 +337,11 @@ export class EventsGateway
     {
       clearInterval(this.intervalIds[roomName]);
       if (leftScore >= 5) {
-        this.server.to('gshim').emit('gameover', 1);
+        this.server.to(roomName).emit('gameover', 1);
       }
       else if (rightScore >= 5) {
-        this.server.to('gshim').emit('gameover', 2);
+        this.server.to(roomName).emit('gameover', 2);
       }
     }
-    
   }
 }
