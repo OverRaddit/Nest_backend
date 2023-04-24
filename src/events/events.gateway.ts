@@ -332,30 +332,31 @@ export class EventsGateway
 
     this.server.to(client.id).emit('enqueuecomplete', 200);
 
-    if (this.matchNormalQueue.length >= 2) {
-      const left = this.matchNormalQueue.shift();
-      const right = this.matchNormalQueue.shift();
-      
+    if (this.matchNormalQueue.length >= 2 || this.matchExtendQueue.length >= 2) {
+      let left;
+      let right;
+      if (this.matchNormalQueue.length >= 2)
+      {
+        left = this.matchNormalQueue.shift();
+        right = this.matchNormalQueue.shift();
+      }
+
+      if (this.matchExtendQueue.length >= 2)
+      {
+        left = this.matchExtendQueue.shift();
+        right = this.matchExtendQueue.shift();
+      }
       const roomName = randomBytes(10).toString('hex');
-      console.log("room Name:", roomName);
-      
-      // before
-      console.log('speed: ', this.GameObject.ball.speed);
-      
       const newGameObject: GameData = createGameData(
         createLeftPlayerObject(),
         createRightPlayerObject(),
         createBallObject(),
       );
-
-      
-
       this.gameRoom[roomName] = newGameObject;
       console.log('gameRoom: ', this.gameRoom);
       console.log('gameRoom[roomName]: ', this.gameRoom[roomName]);
 
       
-
       // TODO roomname 필요
       left.socket.join(roomName); // TODO
       right.socket.join(roomName); // TODO
