@@ -1,3 +1,4 @@
+import { ConsoleLogger } from '@nestjs/common';
 import {
   ConnectedSocket,
   MessageBody,
@@ -11,7 +12,7 @@ import {
 import { randomBytes } from 'crypto';
 import { join } from 'path';
 import { Server, Socket } from 'socket.io';
-import { GameData, BallObject, PlayerObject, QueueData, createBallObject, createLeftPlayerObject, createRightPlayerObject, createGameData } from './game.interface';
+import { GameData, BallObject, PlayerObject, QueueData, SocketInfo,  createBallObject, createLeftPlayerObject, createRightPlayerObject, createGameData } from './game.interface';
 
 // 이 설정들이 뭘하는건지, 애초에 무슨 레포를 보고 이것들을 찾을 수 있는지 전혀 모르겠다.
 @WebSocketGateway(8000, {
@@ -37,15 +38,22 @@ export class EventsGateway
   private ball: BallObject = createBallObject();
 
   private leftUser: PlayerObject = createLeftPlayerObject
-  (0, this.canvasH / 2 - 100 / 2, 10, 100, 0, 0);
+  (0,                this.canvasH / 2 - 100 / 2, 10, 100, 0, 0);
   private rightUser: PlayerObject = createRightPlayerObject
-  (this.canvasW - 10,this.canvasH / 2 - 100 / 2, 10, 100,0,0);
+  (this.canvasW - 10,this.canvasH / 2 - 100 / 2, 10, 100, 0, 0);
 
   private gameRoom: {[key: string]: any} = {};
   // private sock = {sockid, socket};
 
+  
   private intervalIds = {};
 
+  // Waiting Queue
+  private matchNormalQueue = [];
+  private matchExtendQueue = [];
+
+  // 
+  private socketRoomMap = new Map<string, SocketInfo>();
 
   // socketIO server가 처음 켜질(init)될때 동작하는 함수 - OnGatewayInit 짝궁
   // setTimeout(() => console.log("after"), 3000);
@@ -58,21 +66,21 @@ export class EventsGateway
     ball: this.ball
   }
 
-  startGame(roomId: string) {
-    console.log(roomId);
+  startGame(roomName: string) {
     function collision(b, p)
     {
+      const playerTop = p.y;
+      const playerBottom = p.y + p.height;
+      const playerLeft = p.x;
+      const playerRight = p.x + p.width;
+
       b.top = b.y - b.radius;
       b.bottom = b.y + b.radius;
       b.left = b.x - b.radius;
       b.right = b.x + b.radius;
-
-      p.top = p.y;
-      p.bottom = p.y + p.height;
-      p.left = p.x;
-      p.right = p.x + p.width;
-      return b.right > p.left && b.bottom > p.top && 
-              b.left < p.right && b.top < p.bottom;
+      
+      return b.right > playerLeft && b.bottom > playerTop && 
+              b.left < playerRight && b.top < playerBottom;
     }
 
     function resetBall(ball, w, h) {
@@ -85,7 +93,8 @@ export class EventsGateway
       return ball;
     }
     const setId = setInterval(() => {
-      const data = this.gameRoom[roomId];
+      const data = this.gameRoom[roomName];
+      // console.log("before", data)
       
 
       // 40ms마다 실행되는 로직 작성
@@ -99,9 +108,11 @@ export class EventsGateway
       }
       // console.log(data.left, data.right);
       let player = (data.ball.x < this.canvasW / 2) ? data.left : data.right;
+      
       // console.log(data.ball.x, data.ball.y, player.x, player.y);
       if (collision(data.ball, player))
       {
+
         let collidePoint = data.ball.y - (player.y + player.height / 2);
         collidePoint = collidePoint / (player.height / 2);
 
@@ -112,7 +123,6 @@ export class EventsGateway
 
         data.ball.speed += 0.1;
       }
-
       // update paddle
       // console.log(data.left.state, data.right.state)
       if (data.left.state == 1) {
@@ -137,22 +147,26 @@ export class EventsGateway
       if (data.ball.x - data.ball.radius < 0)
       {
         data.right.score++;
-        this.isGameOver(data.left.score, data.right.score, roomId);
+        this.isGameOver(data.left.score, data.right.score, roomName);
         data.ball = resetBall(data.ball, this.canvasW, this.canvasH);
       } 
       else if (data.ball.x + data.ball.radius > this.canvasW){
         data.left.score++;
-        this.isGameOver(data.left.score, data.right.score, roomId);
+        this.isGameOver(data.left.score, data.right.score, roomName);
         data.ball = resetBall(data.ball, this.canvasW, this.canvasH);
         console.log(data.ball);
       }
 
-      this.server.to(roomId).emit('render', data.left, data.right, data.ball, roomId);
+      // TODO left, right, ball, pos, roomName 주기
+      
+      this.server.to(roomName).emit('render', data.left, data.right, data.ball, roomName);
       // 40ms마다 실행되는 로직 작성
       // ex) 게임 프레임 처리
-    }, 40);
+    }, 1000);
     console.log("Set Id:", setId);
-    this.intervalIds[roomId] = setId;
+    this.intervalIds[roomName] = setId;
+
+    // ask
   }
 
   afterInit(server: Server) {
@@ -164,14 +178,65 @@ export class EventsGateway
 
   // 연결된 socket이 연결될때 동작하는 함수 - OnGatewayConnection 짝궁
   handleConnection(client: any, ...args: any[]) {
-
-    // console.log("testsetsetset");
     console.log(`Client connected: ${client.id}`);
   }
 
   // 연결된 socket이 끊어질때 동작하는 함수 - OnGatewayDisconnect 짝궁
-  handleDisconnect() {
-    console.log('WebSocketGateway disconnected');
+  handleDisconnect(client: any, ...args: any[]) {
+    // Get roomName and PlayerId that the client belongs to.
+
+    if (this.socketRoomMap.get(client.id) !== undefined)
+    {
+      const roomName = this.socketRoomMap.get(client.id).roomName;
+      const playerId = this.socketRoomMap.get(client.id).playerId;
+
+      // Delete client in socketRoomMap because of client leave our webPage
+      this.socketRoomMap.delete(client.id);
+      
+      // find client.id is 1p or 2p
+      console.log("roomName:", roomName, "player id 1: left, 2: right", playerId); // 객체
+      
+      // only player 1 and 2 win
+      if (playerId === 1 || playerId === 2)
+      {
+        // player 2p win
+        if (playerId === 1)
+        {
+          console.log(roomName, "is winner 2p");
+          this.server.to(roomName).emit('gameover', 2);
+        }
+        // player 1p win
+        else if (playerId === 2)
+        {
+          console.log(roomName, "is winner 1p");  
+          this.server.to(roomName).emit('gameover', 1);
+        }
+
+        // Stop Game
+        clearInterval(this.intervalIds[roomName]);
+        delete this.intervalIds[roomName];
+
+
+        // socketRoomMap[roomName] all clear
+        // console.log("Roomssss", this.server.sockets.adapter.rooms.get(roomName));
+        const remainClients = this.server.sockets.adapter.rooms.get(roomName);
+        // console.log(typeof(remainClients));
+        for (const key of remainClients) {
+          // console.log(key);
+          this.socketRoomMap.delete(key);
+        }
+
+        // Processing Database
+
+        // remove socket room
+        this.server.socketsLeave(roomName);
+      }
+    }
+    else{
+      console.log("undifined");
+    }
+    // this.socketRoomMap.set(right.socket.id, roomName); 
+    // console.log(this.gameRoom.get(roomName).left,this.gameRoom.get(roomName).right)
   }
 
   /*
@@ -215,7 +280,6 @@ export class EventsGateway
       this.gameRoom[room].right.state = 1;
       console.log(this.gameRoom[room].right);
     }
-    
   }
 
   @SubscribeMessage('handleKeyPressDown')
@@ -241,16 +305,14 @@ export class EventsGateway
   async handleKeyRelUp(@ConnectedSocket() client, 
     @MessageBody() message) {
     // console.log(`${isLeftPlayer}가 up키를 떼었습니다.`);
-    const [room, id] = message;
+    const [roomName, id] = message;
     if (id === 1)
     {
-      this.gameRoom[room].left.state = 0;
-      console.log(this.gameRoom[room].left);
+      this.gameRoom[roomName].left.state = 0;
     }
     else if (id === 2)
     {
-      this.gameRoom[room].right.state = 0;
-      console.log(this.gameRoom[room].left);
+      this.gameRoom[roomName].right.state = 0;
     }
   }
 
@@ -272,8 +334,7 @@ export class EventsGateway
     }
   }
   
-  private matchNormalQueue = [];
-  private matchExtendQueue = [];
+  
 
   // socket의 메시지를 room내부의 모든 이들에게 전달합니다.
   @SubscribeMessage('match')
@@ -312,12 +373,24 @@ export class EventsGateway
         createBallObject(),
       );
 
+      
+
       this.gameRoom[roomName] = newGameObject;
       console.log('gameRoom: ', this.gameRoom);
       console.log('gameRoom[roomName]: ', this.gameRoom[roomName]);
+
+      
+
       // TODO roomname 필요
       left.socket.join(roomName); // TODO
       right.socket.join(roomName); // TODO
+
+      const leftInfo: SocketInfo = {roomName, playerId: 1};
+      const rightInfo: SocketInfo = {roomName, playerId: 2};
+      this.socketRoomMap.set(left.socket.id, leftInfo); 
+      this.socketRoomMap.set(right.socket.id, rightInfo); 
+
+
       this.server.to(roomName).emit('matchingcomplete', 200, roomName);
       this.server.to(left.socket.id).emit('isLeft', 1);
       this.server.to(right.socket.id).emit('isLeft', 2);

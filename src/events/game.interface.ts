@@ -35,6 +35,9 @@ export interface PlayerObject{
   state: number
 };
 
+
+
+
 export function createLeftPlayerObject(
     x: number = 0,
     y: number = canvasH / 2 - 100 / 2,
@@ -71,11 +74,10 @@ export function createBallObject(
 
 
 
-
-
-
-
-
+export interface SocketInfo{
+  roomName: string,
+  playerId: number
+};
 
 export interface QueueData{
   socketId: string,
