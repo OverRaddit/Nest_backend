@@ -30,20 +30,20 @@ export class EventsGateway
   @WebSocketServer()
   server: Server;
 
-  // private intervalId: NodeJS.Timeout;
+  // Board Info ex) canvas, moveValue, MaxGoal
   private canvasW = 600;
   private canvasH = 400;
   private moveValue = 4;
-  // add
+  private maxGoalScore = 5;
+  
+  // Game Object
   private ball: BallObject = createBallObject();
-
   private leftUser: PlayerObject = createLeftPlayerObject
   (0,                this.canvasH / 2 - 100 / 2, 10, 100, 0, 0);
   private rightUser: PlayerObject = createRightPlayerObject
   (this.canvasW - 10,this.canvasH / 2 - 100 / 2, 10, 100, 0, 0);
 
   private gameRoom: {[key: string]: any} = {};
-  // private sock = {sockid, socket};
 
   
   private intervalIds = {};
@@ -52,14 +52,11 @@ export class EventsGateway
   private matchNormalQueue = [];
   private matchExtendQueue = [];
 
-  // 
+  // [key: socketId, value: socketInfo{roomName, playerId}]
   private socketRoomMap = new Map<string, SocketInfo>();
 
   // socketIO server가 처음 켜질(init)될때 동작하는 함수 - OnGatewayInit 짝궁
-  // setTimeout(() => console.log("after"), 3000);
-
-  //startGame이 시작된다면
-
+  
   private GameObject = {
     left: this.leftUser,
     right: this.rightUser,
@@ -90,14 +87,10 @@ export class EventsGateway
   
       ball.speed = 5;
       ball.velocityX = ball.velocityX; 
-      return ball;
     }
+
     const setId = setInterval(() => {
       const data = this.gameRoom[roomName];
-      // console.log("before", data)
-      
-
-      // 40ms마다 실행되는 로직 작성
 
       data.ball.x += data.ball.velocityX;
       data.ball.y += data.ball.velocityY;
@@ -147,26 +140,36 @@ export class EventsGateway
       if (data.ball.x - data.ball.radius < 0)
       {
         data.right.score++;
-        this.isGameOver(data.left.score, data.right.score, roomName);
-        data.ball = resetBall(data.ball, this.canvasW, this.canvasH);
+        resetBall(data.ball, this.canvasW, this.canvasH);
       } 
       else if (data.ball.x + data.ball.radius > this.canvasW){
         data.left.score++;
-        this.isGameOver(data.left.score, data.right.score, roomName);
-        data.ball = resetBall(data.ball, this.canvasW, this.canvasH);
-        console.log(data.ball);
+        resetBall(data.ball, this.canvasW, this.canvasH);
       }
-
-      // TODO left, right, ball, pos, roomName 주기
-      
       this.server.to(roomName).emit('render', data.left, data.right, data.ball, roomName);
-      // 40ms마다 실행되는 로직 작성
-      // ex) 게임 프레임 처리
-    }, 1000);
-    console.log("Set Id:", setId);
-    this.intervalIds[roomName] = setId;
+      
+      
+      if (this.isGameOver(data.left.score, data.right.score, roomName))
+      {
+        // stop interval and clear
+        clearInterval(this.intervalIds[roomName]);
+        delete this.intervalIds[roomName];
 
-    // ask
+        // socketMap clear
+        const remainClients = this.server.sockets.adapter.rooms.get(roomName);
+        for (const key of remainClients) {
+          this.socketRoomMap.delete(key);
+        }
+        console.log("my socket:",this.socketRoomMap);
+
+        // remove socket room
+        this.server.socketsLeave(roomName);
+      }
+    }, 40);
+
+    // set Interval Id => if game end, need to clear setInterval
+    // console.log("Set Id:", setId);
+    this.intervalIds[roomName] = setId;
   }
 
   afterInit(server: Server) {
@@ -184,7 +187,6 @@ export class EventsGateway
   // 연결된 socket이 끊어질때 동작하는 함수 - OnGatewayDisconnect 짝궁
   handleDisconnect(client: any, ...args: any[]) {
     // Get roomName and PlayerId that the client belongs to.
-
     if (this.socketRoomMap.get(client.id) !== undefined)
     {
       const roomName = this.socketRoomMap.get(client.id).roomName;
@@ -193,10 +195,7 @@ export class EventsGateway
       // Delete client in socketRoomMap because of client leave our webPage
       this.socketRoomMap.delete(client.id);
       
-      // find client.id is 1p or 2p
-      console.log("roomName:", roomName, "player id 1: left, 2: right", playerId); // 객체
-      
-      // only player 1 and 2 win
+            // only player 1 and 2 win
       if (playerId === 1 || playerId === 2)
       {
         // player 2p win
@@ -227,43 +226,18 @@ export class EventsGateway
         }
 
         // Processing Database
+        // Alee's TODO
 
-        // remove socket room
+        // remove socket(real socket) room
         this.server.socketsLeave(roomName);
       }
     }
     else{
       console.log("undifined");
     }
-    // this.socketRoomMap.set(right.socket.id, roomName); 
-    // console.log(this.gameRoom.get(roomName).left,this.gameRoom.get(roomName).right)
   }
 
-  /*
-  // socket의 메시지를 room내부의 모든 이들에게 전달합니다.
-  @SubscribeMessage('chat')
-  async handleChat(@ConnectedSocket() client, @MessageBody() data) {
-    console.log('chat: ', data);
-    client.to('gshim').emit('chat', data);
-  }
-
-  // socket을 특정 room에 join 시킵니다.
-  // data에서 방 이름을 가져와야 할 듯?
-  @SubscribeMessage('join')
-  async handleJoin(@ConnectedSocket() client, @MessageBody() data) {
-    client.join('gshim');
-    const gshimNum = this.server.sockets.adapter.rooms.get('gshim').size;
-    console.log('clientId: ', client.id, 'join to room gshim');
-    console.log(
-      `현재 게임룸 현황(${gshimNum}): ${this.server.sockets.adapter.rooms.get(
-        'gshim',
-      )}`,
-    );
-    // join한 socket에게 본인이 왼쪽플레이어인지 오른쪽플레이어인지 알려준다.
-    this.server.to(client.id).emit('isLeft', gshimNum); // TODO
-  }*/
-
-  // 여기서부터 게임이벤트 =====================================
+  // press Up key
   @SubscribeMessage('handleKeyPressUp')
   async handleKeyPressUp(
     @ConnectedSocket() client,
@@ -282,6 +256,7 @@ export class EventsGateway
     }
   }
 
+  // press Down key
   @SubscribeMessage('handleKeyPressDown')
   async handleKeyPressDown(
     @ConnectedSocket() client,
@@ -301,10 +276,11 @@ export class EventsGateway
     }
   }
 
+  // release Up Key
   @SubscribeMessage('handleKeyRelUp')
-  async handleKeyRelUp(@ConnectedSocket() client, 
+  async handleKeyRelUp(
+    @ConnectedSocket() client, 
     @MessageBody() message) {
-    // console.log(`${isLeftPlayer}가 up키를 떼었습니다.`);
     const [roomName, id] = message;
     if (id === 1)
     {
@@ -316,21 +292,20 @@ export class EventsGateway
     }
   }
 
+  // release Down Key
   @SubscribeMessage('handleKeyRelDown')
   async handleKeyRelDown(
     @ConnectedSocket() client,
     @MessageBody() message,
   ) {
-    const [room, id] = message;
+    const [roomName, id] = message;
     if (id === 1)
     {
-      this.gameRoom[room].left.state = 0;
-      console.log(this.gameRoom[room].left);
+      this.gameRoom[roomName].left.state = 0;
     }
     else if (id === 2)
     {
-      this.gameRoom[room].right.state = 0;
-      console.log(this.gameRoom[room].left);
+      this.gameRoom[roomName].right.state = 0;
     }
   }
   
@@ -402,34 +377,17 @@ export class EventsGateway
 
   isGameOver(leftScore : number, rightScore : number, roomName: string)
   {
-    if (leftScore >= 5 || rightScore >= 5)
+    if (leftScore >= this.maxGoalScore || rightScore >= this.maxGoalScore)
     {
-      clearInterval(this.intervalIds[roomName]);
-      if (leftScore >= 5) {
-        // TODO: DB올려야 함.
-        
+      if (leftScore >= this.maxGoalScore) {
         this.server.to(roomName).emit('gameover', 1);
-        // console.log(this.server.sockets.adapter.rooms);
-        console.log(roomName);
-        const socketIds = this.server.sockets.adapter.rooms;
-        console.log(socketIds);
-        const test = socketIds.get(roomName);
-        console.log("test", test);
-
-        // remoteLeave
-
-        this.server.socketsLeave(roomName);
-        console.log(this.server.sockets.adapter.rooms);
-        // console.log(this.server);
-        // this.gameRoom.delete(roomName);
       }
-      else if (rightScore >= 5) {
-        console.log(this.server.sockets.adapter.rooms);
-        // TODO: DB올려야 함.
-        // this.gameRoom.delete(roomName);
+      else if (rightScore >= this.maxGoalScore) {
         this.server.to(roomName).emit('gameover', 2);
       }
+      return true;
     }
+    return false;
   }
 
   // cancel queue event
