@@ -52,8 +52,11 @@ export class EventsGateway
   private matchNormalQueue = [];
   private matchExtendQueue = [];
 
+  // [key: nick, value: socketId]
+  private nicktSocketMap = new Map<string, string>();
   // [key: socketId, value: socketInfo{roomName, playerId}]
   private socketRoomMap = new Map<string, SocketInfo>();
+  
 
   // socketIO server가 처음 켜질(init)될때 동작하는 함수 - OnGatewayInit 짝궁
   
@@ -417,7 +420,19 @@ export class EventsGateway
     }
     this.server.to(client.id).emit('cancel queue complete', 200);
   }
+
+  @SubscribeMessage('want observer')
+  async WatchingGame(@ConnectedSocket() client, @MessageBody() data) {
+
+    const nickName: string = data;
+    const sockid: string = this.nicktSocketMap.get(nickName);
+    if (sockid !== undefined)
+    {
+      const roomName = this.socketRoomMap.get(sockid).roomName;
+      client.join(roomName);
+      this.server.to(client.id).emit('game observer', 200);  
+    }
+  }
 }
 
-// todo list
-// 1. if click cancel, delete queue list
+
