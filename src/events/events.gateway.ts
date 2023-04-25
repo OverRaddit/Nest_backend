@@ -12,7 +12,7 @@ import {
 import { randomBytes } from 'crypto';
 import { join } from 'path';
 import { Server, Socket } from 'socket.io';
-import { GameData, BallObject, PlayerObject, QueueData, SocketInfo,  createBallObject, createLeftPlayerObject, createRightPlayerObject, createGameData } from './game.interface';
+import { GameData, BallObject, PlayerObject, SocketInfo, GameType, createBallObject, createLeftPlayerObject, createRightPlayerObject, createGameData, createGameType } from './game.interface';
 
 // 이 설정들이 뭘하는건지, 애초에 무슨 레포를 보고 이것들을 찾을 수 있는지 전혀 모르겠다.
 @WebSocketGateway(8000, {
@@ -45,7 +45,7 @@ export class EventsGateway
 
   private gameRoom: {[key: string]: any} = {};
 
-  
+  // frame id
   private intervalIds = {};
 
   // Waiting Queue
@@ -158,6 +158,7 @@ export class EventsGateway
         clearInterval(this.intervalIds[roomName]);
         delete this.intervalIds[roomName];
 
+        console.log("nickname Test", data.left.nick, data.right.nick);
         // socketMap clear
         const remainClients = this.server.sockets.adapter.rooms.get(roomName);
         for (const key of remainClients) {
@@ -165,10 +166,22 @@ export class EventsGateway
         }
         console.log("my socket:",this.socketRoomMap);
 
+        const gameType = this.gameRoom[roomName].type.flag;
+        let winScore, loseScore, winId, loserId;
+        
+        const winner = data.left.score > data.right.score ? data.left : data.right;
+        const loser = data.left.score < data.right.score ? data.left : data.right;
+        winScore = winner.score;
+        loseScore = loser.score;
+        winId = winner.nick;
+        loserId = loser.nick;
+
+        console.log("state: graceful exit", "mapNumber:", gameType, winScore, loseScore, "id:", winId, loserId);
+
         // remove socket room
         this.server.socketsLeave(roomName);
       }
-    }, 40);
+    }, 20);
 
     // set Interval Id => if game end, need to clear setInterval
     // console.log("Set Id:", setId);
@@ -201,17 +214,28 @@ export class EventsGateway
             // only player 1 and 2 win
       if (playerId === 1 || playerId === 2)
       {
+        let winScore, loseScore, winId, loserId;
+        const gameType = this.gameRoom[roomName].type.flag;
         // player 2p win
         if (playerId === 1)
         {
           console.log(roomName, "is winner 2p");
           this.server.to(roomName).emit('gameover', 2);
+          winScore = this.gameRoom[roomName].right.score;
+          loseScore = this.gameRoom[roomName].left.score;
+          winId = this.gameRoom[roomName].right.nick;
+          loserId = this.gameRoom[roomName].left.nick;
         }
         // player 1p win
         else if (playerId === 2)
         {
           console.log(roomName, "is winner 1p");  
           this.server.to(roomName).emit('gameover', 1);
+          
+          winScore = this.gameRoom[roomName].left.score;
+          loseScore = this.gameRoom[roomName].right.score;
+          winId = this.gameRoom[roomName].left.nick;
+          loserId = this.gameRoom[roomName].right.nick;
         }
 
         // Stop Game
@@ -230,6 +254,7 @@ export class EventsGateway
 
         // Processing Database
         // Alee's TODO
+        console.log("state: Quit", "mapNumber:", gameType, winScore, loseScore, "id:", winId, loserId);
 
         // remove socket(real socket) room
         this.server.socketsLeave(roomName);
@@ -323,6 +348,7 @@ export class EventsGateway
     const queueData = {
       socket: client,
       gameType: data
+      // nickname
     };
 
     // type에 따라 큐 넣기
@@ -338,23 +364,32 @@ export class EventsGateway
     if (this.matchNormalQueue.length >= 2 || this.matchExtendQueue.length >= 2) {
       let left;
       let right;
+      let gameType;
       if (this.matchNormalQueue.length >= 2)
       {
         left = this.matchNormalQueue.shift();
         right = this.matchNormalQueue.shift();
+        gameType = false;
       }
 
       if (this.matchExtendQueue.length >= 2)
       {
         left = this.matchExtendQueue.shift();
         right = this.matchExtendQueue.shift();
+        gameType = true;
       }
+
       const roomName = randomBytes(10).toString('hex');
-      const newGameObject: GameData = createGameData(
+      const newGameObject: GameData = 
+      createGameData(
         createLeftPlayerObject(),
         createRightPlayerObject(),
         createBallObject(),
+        createGameType(gameType),
       );
+      
+      // nickname add part
+
       this.gameRoom[roomName] = newGameObject;
       console.log('gameRoom: ', this.gameRoom);
       console.log('gameRoom[roomName]: ', this.gameRoom[roomName]);
@@ -431,7 +466,28 @@ export class EventsGateway
       const roomName = this.socketRoomMap.get(sockid).roomName;
       client.join(roomName);
       this.server.to(client.id).emit('game observer', 200);  
+      this.server.to(client.id).emit('isLeft', 3);
     }
+  }
+
+  @SubscribeMessage('Invite Game')
+  async InviteGame(@ConnectedSocket() client, @MessageBody() data)
+  {
+    const nickName: string = data;
+    const sockid: string = this.nicktSocketMap.get(nickName);
+    if (sockid !== undefined)
+    {
+      const roomName = this.socketRoomMap.get(sockid).roomName;
+      client.join(roomName);
+      this.server.to(client.id).emit('game observer', 200);  
+      this.server.to(client.id).emit('isLeft', 3);
+    }
+  }
+
+  @SubscribeMessage('Invite OK')
+  async InviteOK(@ConnectedSocket() client, @MessageBody() data)
+  {
+    
   }
 }
 
