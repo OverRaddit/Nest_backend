@@ -443,7 +443,6 @@ export class EventsGateway
         console.log(this.matchNormalQueue[i].socket.id, client.id);
         if (this.matchNormalQueue[i].socket.id === client.id) { 
           this.matchNormalQueue.splice(i, 1);
-          console.log("qwer");
           break;
         }
       }
@@ -469,6 +468,9 @@ export class EventsGateway
       client.join(roomName);
       this.server.to(client.id).emit('game observer', 200);  
       this.server.to(client.id).emit('isLeft', 3);
+    }
+    else {
+      this.server.to(client.id).emit('observer fail', 200);
     }
   }
 
