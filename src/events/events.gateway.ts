@@ -477,21 +477,34 @@ export class EventsGateway
   @SubscribeMessage('Invite Game')
   async InviteGame(@ConnectedSocket() client, @MessageBody() data)
   {
-    const nickName: string = data;
-    const sockid: string = this.nicktSocketMap.get(nickName);
-    if (sockid !== undefined)
+    // 1. Check if your opponent is online or offline
+    // 2. Check if your opponent is playing or spectating
+    // 3. return invite complete event
+    /*
+    if (online)
     {
-      const roomName = this.socketRoomMap.get(sockid).roomName;
-      client.join(roomName);
-      this.server.to(client.id).emit('game observer', 200);  
-      this.server.to(client.id).emit('isLeft', 3);
+      if (playing x)
+        this.server.to(client.id).emit('invite complete');    
     }
+    */
+    
+    // else invite fail.
+    this.server.to(client.id).emit('invite fail');
   }
 
-  @SubscribeMessage('Invite OK')
+  @SubscribeMessage('Accept invitation')
   async InviteOK(@ConnectedSocket() client, @MessageBody() data)
   {
-    
+    // 1. Check if your opponent is online or offline
+    // 2. Check if your opponent is playing or spectating
+    // 3. return invite complete event
+    /*
+    if (online)
+    {
+      if (playing x)
+        this.server.to(client.id).emit('invite complete');    
+    }
+    */
   }
 }
 
