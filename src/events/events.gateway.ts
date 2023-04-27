@@ -440,14 +440,16 @@ export class EventsGateway
     if (data === false)
     {
       for(var i = 0; i < this.matchNormalQueue.length; i++){ 
-        if (this.matchNormalQueue[i].socket === client.id) { 
-          this.matchNormalQueue.splice(i, 1); 
+        console.log(this.matchNormalQueue[i].socket.id, client.id);
+        if (this.matchNormalQueue[i].socket.id === client.id) { 
+          this.matchNormalQueue.splice(i, 1);
+          console.log("qwer");
           break;
         }
       }
     } else{
       for(var i = 0; i < this.matchNormalQueue.length; i++){ 
-        if (this.matchExtendQueue[i].socket === client.id) { 
+        if (this.matchExtendQueue[i].socket.id === client.id) { 
           this.matchExtendQueue.splice(i, 1); 
           break;
         }
