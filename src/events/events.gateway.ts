@@ -474,37 +474,91 @@ export class EventsGateway
     }
   }
 
+
+  // sessionMap:[nick, socket]
+  private sessionMap = {};
   @SubscribeMessage('Invite Game')
   async InviteGame(@ConnectedSocket() client, @MessageBody() data)
   {
+    const [nickName] = data;
+
     // 1. Check if your opponent is online or offline
+    const socketData = this.sessionMap[nickName];
+    if (socketData === undefined)
+      this.server.to(client.id).emit('invite message fail');  
+
     // 2. Check if your opponent is playing or spectating
+    if (socketData.state === 'ingame')
+      this.server.to(client.id).emit('invite message fail');  
     // 3. return invite complete event
-    /*
-    if (online)
-    {
-      if (playing x)
-        this.server.to(client.id).emit('invite complete');    
-    }
-    */
-    
-    // else invite fail.
-    this.server.to(client.id).emit('invite fail');
+    this.server.to(client.id).emit('invite message complete');
   }
 
   @SubscribeMessage('Accept invitation')
   async InviteOK(@ConnectedSocket() client, @MessageBody() data)
   {
+    const [nickName, enqueueFlag, gameType] = data;
+
     // 1. Check if your opponent is online or offline
+    const socketData = this.sessionMap[nickName];
+    if (socketData === undefined)
+      this.server.to(client.id).emit('invite fail');  
+
     // 2. Check if your opponent is playing or spectating
+    if (socketData.state === 'ingame')
+      this.server.to(client.id).emit('invite fail');  
     // 3. return invite complete event
-    /*
-    if (online)
+    // 3-1. remove my data in WaitingQueue
+    if (enqueueFlag === true)
     {
-      if (playing x)
-        this.server.to(client.id).emit('invite complete');    
+      for(var i = 0; i < this.matchNormalQueue.length; i++){ 
+        console.log(this.matchNormalQueue[i].socket.nickName, client.id);
+        if (this.matchNormalQueue[i].socket.nickName === nickName) { 
+          this.matchNormalQueue.splice(i, 1);
+          break;
+        }
+      }
+      for(var i = 0; i < this.matchNormalQueue.length; i++){ 
+        if (this.matchExtendQueue[i].socket.nickName === nickName) { 
+          this.matchExtendQueue.splice(i, 1); 
+          break;
+        }
+      }
+      this.server.to(client.id).emit('cancel queue complete', 200);
     }
-    */
+    client.join
+    // 3-2. create room
+    const roomName = randomBytes(10).toString('hex');
+
+    // 3-3. create GameObject
+    const newGameObject: GameData = 
+    createGameData(
+      createLeftPlayerObject(),
+      createRightPlayerObject(),
+      createBallObject(),
+      createGameType(gameType),
+    );
+    this.gameRoom[roomName] = newGameObject;
+
+    // 3-4. join room
+    client.join(roomName); // TODO
+    socketData.join(roomName); // TODO
+
+    const leftInfo: SocketInfo = {roomName, playerId: 1};
+    const rightInfo: SocketInfo = {roomName, playerId: 2};
+    this.socketRoomMap.set(client.id, leftInfo); 
+    this.socketRoomMap.set(socketData.id, rightInfo); 
+
+    // 3-5. both set id
+    this.server.to(roomName).emit('matchingcomplete', 200, roomName);
+    this.server.to(client.id).emit('isLeft', 1);
+    this.server.to(socketData.id).emit('isLeft', 2);
+
+    console.log("matching 완료");
+    this.startGame(roomName);
+
+    // 3-6. send complete message
+    this.server.to(client.id).emit('invite complete');
   }
 }
 
