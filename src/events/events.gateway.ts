@@ -526,7 +526,6 @@ export class EventsGateway
       }
       this.server.to(client.id).emit('cancel queue complete', 200);
     }
-    client.join
     // 3-2. create room
     const roomName = randomBytes(10).toString('hex');
 
