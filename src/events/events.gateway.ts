@@ -179,6 +179,7 @@ export class EventsGateway
         console.log("state: graceful exit", "mapNumber:", gameType, winScore, loseScore, "id:", winId, loserId);
 
         // remove socket room
+        delete this.gameRoom[roomName];
         this.server.socketsLeave(roomName);
       }
     }, 20);
@@ -198,6 +199,8 @@ export class EventsGateway
   // 연결된 socket이 연결될때 동작하는 함수 - OnGatewayConnection 짝궁
   handleConnection(client: any, ...args: any[]) {
     console.log(`Client connected: ${client.id}`);
+    this.sessionMap[client.id] = client;
+    // console.log("test", this.sessionMap);
   }
 
   // 연결된 socket이 끊어질때 동작하는 함수 - OnGatewayDisconnect 짝궁
@@ -263,6 +266,9 @@ export class EventsGateway
     else{
       console.log("undifined");
     }
+
+    delete this.sessionMap[client.id];
+    console.log(this.sessionMap);
   }
 
   // press Up key
@@ -480,33 +486,55 @@ export class EventsGateway
   @SubscribeMessage('Invite Game')
   async InviteGame(@ConnectedSocket() client, @MessageBody() data)
   {
-    const [nickName] = data;
-
+    
+    const nickName = data;
+    console.log("tq", data, nickName);
     // 1. Check if your opponent is online or offline
     const socketData = this.sessionMap[nickName];
     if (socketData === undefined)
+    {
       this.server.to(client.id).emit('invite message fail');  
+      console.log("1번 펑");
+      return ;
+    }
 
     // 2. Check if your opponent is playing or spectating
-    if (socketData.state === 'ingame')
+    if (socketData.state === 'inGame')
+    {
       this.server.to(client.id).emit('invite message fail');  
+      console.log("2번 펑");
+      return ;
+    }
     // 3. return invite complete event
     this.server.to(client.id).emit('invite message complete');
+    console.log("opp:id:", this.sessionMap[nickName].id)
+    this.server.to(socketData.id).emit('invite message', client.id);
   }
 
   @SubscribeMessage('Accept invitation')
   async InviteOK(@ConnectedSocket() client, @MessageBody() data)
   {
+
     const [nickName, enqueueFlag, gameType] = data;
 
+    console.log(data);
     // 1. Check if your opponent is online or offline
     const socketData = this.sessionMap[nickName];
+    
     if (socketData === undefined)
+    {
       this.server.to(client.id).emit('invite fail');  
+      console.log("InviteOK 1번 실패");
+      return ;
+    }
 
     // 2. Check if your opponent is playing or spectating
     if (socketData.state === 'ingame')
+    {
       this.server.to(client.id).emit('invite fail');  
+      console.log("InviteOK 2번 실패");
+      return ;
+    }
     // 3. return invite complete event
     // 3-1. remove my data in WaitingQueue
     if (enqueueFlag === true)
