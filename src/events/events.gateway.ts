@@ -182,7 +182,7 @@ export class EventsGateway
         delete this.gameRoom[roomName];
         this.server.socketsLeave(roomName);
       }
-    }, 20);
+    }, 1000);
 
     // set Interval Id => if game end, need to clear setInterval
     // console.log("Set Id:", setId);
@@ -268,7 +268,7 @@ export class EventsGateway
     }
 
     delete this.sessionMap[client.id];
-    console.log(this.sessionMap);
+    // console.log(this.sessionMap);
   }
 
   // press Up key
@@ -465,15 +465,20 @@ export class EventsGateway
 
   @SubscribeMessage('want observer')
   async WatchingGame(@ConnectedSocket() client, @MessageBody() data) {
-
     const nickName: string = data;
-    const sockid: string = this.nicktSocketMap.get(nickName);
-    if (sockid !== undefined)
+    console.log("want Observer", nickName, this.socketRoomMap);
+    const sock: SocketInfo = this.socketRoomMap.get(nickName);
+    console.log("sock TEst", sock);
+    if (sock !== undefined)
     {
-      const roomName = this.socketRoomMap.get(sockid).roomName;
+
+      const roomName: string = sock.roomName;
       client.join(roomName);
-      this.server.to(client.id).emit('game observer', 200);  
-      this.server.to(client.id).emit('isLeft', 3);
+      console.log("client Test", client);
+      console.log("observer", roomName);
+      this.server.to(roomName).emit('matchingcomplete', 200, roomName);
+      // this.server.to(client.id).emit('game observer', 200);  
+      // this.server.to(client.id).emit('isLeft', 3);
     }
     else {
       this.server.to(client.id).emit('observer fail', 200);
@@ -488,7 +493,7 @@ export class EventsGateway
   {
     
     const nickName = data;
-    console.log("tq", data, nickName);
+    // console.log("tq", data, nickName);
     // 1. Check if your opponent is online or offline
     const socketData = this.sessionMap[nickName];
     if (socketData === undefined)
@@ -507,7 +512,7 @@ export class EventsGateway
     }
     // 3. return invite complete event
     this.server.to(client.id).emit('invite message complete');
-    console.log("opp:id:", this.sessionMap[nickName].id)
+    // console.log("opp:id:", this.sessionMap[nickName].id)
     this.server.to(socketData.id).emit('invite message', client.id);
   }
 
@@ -517,7 +522,7 @@ export class EventsGateway
 
     const [nickName, enqueueFlag, gameType] = data;
 
-    console.log(data);
+    // console.log(data);
     // 1. Check if your opponent is online or offline
     const socketData = this.sessionMap[nickName];
     
@@ -568,6 +573,7 @@ export class EventsGateway
     this.gameRoom[roomName] = newGameObject;
 
     // 3-4. join room
+    console.log("RoomName Check", roomName);
     client.join(roomName); // TODO
     socketData.join(roomName); // TODO
 
@@ -575,6 +581,7 @@ export class EventsGateway
     const rightInfo: SocketInfo = {roomName, playerId: 2};
     this.socketRoomMap.set(client.id, leftInfo); 
     this.socketRoomMap.set(socketData.id, rightInfo); 
+    console.log("join", this.socketRoomMap);
 
     // 3-5. both set id
     this.server.to(roomName).emit('matchingcomplete', 200, roomName);
