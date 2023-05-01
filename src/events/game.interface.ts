@@ -88,15 +88,22 @@ export function createBallObject(
   return { x, y, radius, speed, velocityX, velocityY };
 }
 
-
-
-
 export interface SocketInfo{
   roomName: string,
   playerId: number
 };
 
-export interface QueueData{
+export interface QueueObject{
   socketId: string,
-  gameType: boolean
+  gameType: MapStatus
 };
+
+export enum ExitStatus {
+  CRASH = 0,
+  GRACEFUL_SHUTDOWN = 1,
+}
+
+export enum MapStatus {
+  NORMAL = 0,
+  EXTENDED = 1,
+}

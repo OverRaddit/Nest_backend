@@ -1,4 +1,3 @@
-import { ConsoleLogger } from '@nestjs/common';
 import {
   ConnectedSocket,
   MessageBody,
@@ -10,10 +9,8 @@ import {
   WebSocketServer,
 } from '@nestjs/websockets';
 import { randomBytes } from 'crypto';
-import { join } from 'path';
 import { Server, Socket } from 'socket.io';
-import { GameData, BallObject, PlayerObject, SocketInfo, GameType, createBallObject, createLeftPlayerObject, createRightPlayerObject, createGameData, createGameType } from './game.interface';
-
+import { GameData, BallObject, PlayerObject, SocketInfo, ExitStatus, MapStatus, QueueObject, createBallObject, createLeftPlayerObject, createRightPlayerObject, createGameData, createGameType } from './game.interface';
 // 이 설정들이 뭘하는건지, 애초에 무슨 레포를 보고 이것들을 찾을 수 있는지 전혀 모르겠다.
 @WebSocketGateway(8000, {
   cors: {
@@ -35,13 +32,6 @@ export class EventsGateway
   private canvasH = 400;
   private moveValue = 4;
   private maxGoalScore = 5;
-  
-  // Game Object
-  private ball: BallObject = createBallObject();
-  private leftUser: PlayerObject = createLeftPlayerObject
-  (0,                this.canvasH / 2 - 100 / 2, 10, 100, 0, 0);
-  private rightUser: PlayerObject = createRightPlayerObject
-  (this.canvasW - 10,this.canvasH / 2 - 100 / 2, 10, 100, 0, 0);
 
   private gameRoom: {[key: string]: any} = {};
 
@@ -52,44 +42,34 @@ export class EventsGateway
   private matchNormalQueue = [];
   private matchExtendQueue = [];
 
-  // [key: nick, value: socketId]
-  private nicktSocketMap = new Map<string, string>();
   // [key: socketId, value: socketInfo{roomName, playerId}]
   private socketRoomMap = new Map<string, SocketInfo>();
-  
-
-  // socketIO server가 처음 켜질(init)될때 동작하는 함수 - OnGatewayInit 짝궁
-  
-  private GameObject = {
-    left: this.leftUser,
-    right: this.rightUser,
-    ball: this.ball
-  }
 
   startGame(roomName: string) {
-    function collision(b, p)
+    function collision(b:BallObject, p: PlayerObject) : boolean
     {
       const playerTop = p.y;
       const playerBottom = p.y + p.height;
       const playerLeft = p.x;
       const playerRight = p.x + p.width;
 
-      b.top = b.y - b.radius;
-      b.bottom = b.y + b.radius;
-      b.left = b.x - b.radius;
-      b.right = b.x + b.radius;
+      const ballTop = b.y - b.radius;
+      const ballBottom = b.y + b.radius;
+      const ballLeft = b.x - b.radius;
+      const ballRight = b.x + b.radius;
+
       
-      return b.right > playerLeft && b.bottom > playerTop && 
-              b.left < playerRight && b.top < playerBottom;
+      return ballRight > playerLeft && ballBottom > playerTop && 
+              ballLeft < playerRight && ballTop < playerBottom;
     }
 
-    function resetBall(ball, w, h) {
+    function resetBall(ball : BallObject, w : number, h : number) {
       // console.log(ball, w,h);
       ball.x = w / 2;
       ball.y = h / 2;
   
       ball.speed = 5;
-      ball.velocityX = ball.velocityX; 
+      ball.velocityX = -ball.velocityX; 
     }
 
     const setId = setInterval(() => {
@@ -182,7 +162,7 @@ export class EventsGateway
         delete this.gameRoom[roomName];
         this.server.socketsLeave(roomName);
       }
-    }, 1000);
+    }, 40);
 
     // set Interval Id => if game end, need to clear setInterval
     // console.log("Set Id:", setId);
@@ -420,7 +400,7 @@ export class EventsGateway
     }
   }
 
-  isGameOver(leftScore : number, rightScore : number, roomName: string)
+  isGameOver(leftScore : number, rightScore : number, roomName: string) : boolean
   {
     if (leftScore >= this.maxGoalScore || rightScore >= this.maxGoalScore)
     {
@@ -452,7 +432,7 @@ export class EventsGateway
           break;
         }
       }
-    } else{
+    } else {
       for(var i = 0; i < this.matchNormalQueue.length; i++){ 
         if (this.matchExtendQueue[i].socket.id === client.id) { 
           this.matchExtendQueue.splice(i, 1); 
@@ -491,7 +471,6 @@ export class EventsGateway
   @SubscribeMessage('Invite Game')
   async InviteGame(@ConnectedSocket() client, @MessageBody() data)
   {
-    
     const nickName = data;
     // console.log("tq", data, nickName);
     // 1. Check if your opponent is online or offline
@@ -595,5 +574,3 @@ export class EventsGateway
     this.server.to(client.id).emit('invite complete');
   }
 }
-
-
