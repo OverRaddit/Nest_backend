@@ -573,4 +573,16 @@ export class EventsGateway
     // 3-6. send complete message
     this.server.to(client.id).emit('invite complete');
   }
+
+
+  @SubscribeMessage('playerBackspace')
+  async BackClick(@ConnectedSocket() client, @MessageBody() data)
+  {
+    const [roomName, nickName] = data;
+
+    console.log(roomName, nickName);
+    // 1.
+  }
+
+
 }
