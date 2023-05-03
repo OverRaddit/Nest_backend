@@ -1,3 +1,5 @@
+import { Socket } from 'socket.io';
+
 export interface GameData {
     left: PlayerObject,
     right: PlayerObject,
@@ -94,7 +96,7 @@ export interface SocketInfo{
 };
 
 export interface QueueObject{
-  socketId: string,
+  socket: Socket,
   gameType: MapStatus
 };
 

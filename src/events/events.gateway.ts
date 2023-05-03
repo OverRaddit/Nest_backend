@@ -9,6 +9,7 @@ import {
   WebSocketServer,
 } from '@nestjs/websockets';
 import { randomBytes } from 'crypto';
+import { map } from 'rxjs';
 import { Server, Socket } from 'socket.io';
 import { GameData, BallObject, PlayerObject, SocketInfo, ExitStatus, MapStatus, QueueObject, createBallObject, createLeftPlayerObject, createRightPlayerObject, createGameData, createGameType } from './game.interface';
 // 이 설정들이 뭘하는건지, 애초에 무슨 레포를 보고 이것들을 찾을 수 있는지 전혀 모르겠다.
@@ -140,7 +141,8 @@ export class EventsGateway
         winId = winner.nick;
         loserId = loser.nick;
 
-        console.log("state: graceful exit", "mapNumber:", gameType, winScore, loseScore, "id:", winId, loserId);
+        // console.log("state: graceful exit", "mapNumber:", gameType, winScore, loseScore, "id:", winId, loserId);
+        console.log(ExitStatus.GRACEFUL_SHUTDOWN, gameType, winScore, loseScore, winId, loserId);
 
         // remove socket room
         delete this.gameRoom[roomName];
@@ -211,7 +213,7 @@ export class EventsGateway
 
         // Processing Database
         // Alee's TODO
-        // console.log("state: Quit", "mapNumber:", gameType, winScore, loseScore, "id:", winId, loserId);
+        console.log(ExitStatus.CRASH, gameType, winScore, loseScore, winId, loserId);
 
         // remove socket(real socket) room
         this.server.socketsLeave(roomName);
@@ -287,8 +289,8 @@ export class EventsGateway
 
   // socket의 메시지를 room내부의 모든 이들에게 전달합니다.
   @SubscribeMessage('match')
-  async enqueueMatch(@ConnectedSocket() client, @MessageBody() data) {
-    const queueData = {
+  async enqueueMatch(@ConnectedSocket() client: Socket, @MessageBody() data) {
+    const queueData: QueueObject = {
       socket: client,
       gameType: data
       // nickname
@@ -352,10 +354,10 @@ export class EventsGateway
   isGameOver(leftScore: number, rightScore: number, roomName: string): boolean {
     if (leftScore >= this.maxGoalScore || rightScore >= this.maxGoalScore) {
       if (leftScore >= this.maxGoalScore) {
-        this.server.to(roomName).emit('gameover', 1);
+        this.server.to(roomName).emit('gameover', 1); // TODO
       }
       else if (rightScore >= this.maxGoalScore) {
-        this.server.to(roomName).emit('gameover', 2);
+        this.server.to(roomName).emit('gameover', 2); // TODO
       }
       return true;
     }
@@ -491,14 +493,11 @@ export class EventsGateway
     this.server.to(client.id).emit('invite complete');
   }
 
-
   @SubscribeMessage('playerBackspace')
   async BackClick(@ConnectedSocket() client, @MessageBody() data) {
     const [roomName, nickName] = data;
 
-    console.log(roomName, nickName);
-    // 1.
+    // this.server.to(roomName).emit('afk', nickName); // TODO
+    this.server.to(roomName).emit('gameover', 1); // TODO
   }
-
-
 }
