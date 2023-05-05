@@ -97,13 +97,16 @@ export class EventsGateway
 
         gameObject.ball.speed += 0.1;
       }
-      // update paddle
+
+      // update player left paddle
       if (gameObject.left.state == 1) {
         gameObject.left.y = Math.max(gameObject.left.y - this.moveValue, 0);
       }
       else if (gameObject.left.state == 2) {
         gameObject.left.y = Math.min(gameObject.left.y + this.moveValue, this.canvasH - gameObject.left.height);
       }
+
+      // update player right paddle
       if (gameObject.right.state == 1) {
         gameObject.right.y = Math.max(gameObject.right.y - this.moveValue, 0);
       }
@@ -122,7 +125,7 @@ export class EventsGateway
       }
       this.server.to(roomName).emit('render', gameObject.left, gameObject.right, gameObject.ball, roomName);
 
-
+      // check GameOver and proceed over logic
       if (this.isGameOver(gameObject.left.score, gameObject.right.score, roomName)) {
         // stop interval and clear
         clearInterval(this.intervalIds[roomName]);
