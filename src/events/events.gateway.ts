@@ -166,9 +166,12 @@ export class EventsGateway
 
   // 연결된 socket이 연결될때 동작하는 함수 - OnGatewayConnection 짝궁
   handleConnection(client: any, ...args: any[]) {
-    console.log(`Client connected: ${client.id}`);
+    // if connected, print socketid
+    console.log(`Client connected!!! your socketid is: ${client.id}`);
+
+    // key[socketid] : value[original socket]
     this.sessionMap[client.id] = client;
-    // console.log("test", this.sessionMap);
+
   }
 
   // 연결된 socket이 끊어질때 동작하는 함수 - OnGatewayDisconnect 짝궁
