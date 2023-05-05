@@ -47,12 +47,17 @@ export class EventsGateway
   private socketRoomMap = new Map<string, SocketInfo>();
 
   startGame(roomName: string) {
-    function collision(b: BallObject, p: PlayerObject): boolean {
+    function checkBallAndPaddleCollision(b: BallObject, p: PlayerObject): boolean {
       const [playerTop, playerBottom, playerLeft, playerRight] = [p.y,            p.y + p.height, p.x,            p.x + p.width];
       const [ballTop,   ballBottom,   ballLeft,   ballRight]   = [b.y - b.radius, b.y + b.radius, b.x - b.radius, b.x + b.radius];
 
       return ballRight > playerLeft && ballBottom > playerTop &&
         ballLeft < playerRight && ballTop < playerBottom;
+    }
+
+    function checkBallAndWallCollision(gameObject: GameData, canvasHeight: number): boolean {
+      return gameObject.ball.y + gameObject.ball.radius > canvasHeight ||
+        gameObject.ball.y - gameObject.ball.radius < 0;
     }
 
     function resetBall(ball: BallObject, w: number, h: number): void {
@@ -76,13 +81,12 @@ export class EventsGateway
       gameObject.ball.y += gameObject.ball.velocityY;
 
 
-      if (gameObject.ball.y + gameObject.ball.radius > this.canvasH ||
-        gameObject.ball.y - gameObject.ball.radius < 0) {
+      if (checkBallAndWallCollision(gameObject, this.canvasH)) { // TODO
         gameObject.ball.velocityY = -gameObject.ball.velocityY;
       }
       let player = (gameObject.ball.x < this.canvasW / 2) ? gameObject.left : gameObject.right;
 
-      if (collision(gameObject.ball, player)) {
+      if (checkBallAndPaddleCollision(gameObject.ball, player)) {
         let collidePoint = gameObject.ball.y - (player.y + player.height / 2);
         collidePoint = collidePoint / (player.height / 2);
 
