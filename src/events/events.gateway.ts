@@ -290,10 +290,11 @@ export class EventsGateway
   // socket의 메시지를 room내부의 모든 이들에게 전달합니다.
   @SubscribeMessage('match')
   async enqueueMatch(@ConnectedSocket() client: Socket, @MessageBody() data) {
+    const {type, nickName} = data;
     const queueData: QueueObject = {
       socket: client,
-      gameType: data
-      // nickname
+      gameType: data,
+      nickName: nickName,
     };
 
     // type에 따라 큐 넣기
@@ -325,8 +326,8 @@ export class EventsGateway
       const roomName = randomBytes(10).toString('hex');
       const newGameObject: GameData =
         createGameData(
-          createLeftPlayerObject(),
-          createRightPlayerObject(),
+          createLeftPlayerObject({nick: left.nick }),
+          createRightPlayerObject({nick: right.nick }),
           createBallObject(),
           createGameType(gameType),
         );
@@ -466,8 +467,8 @@ export class EventsGateway
     // 3-3. create GameObject
     const newGameObject: GameData =
       createGameData(
-        createLeftPlayerObject(),
-        createRightPlayerObject(),
+        createLeftPlayerObject({nick: 'alee' }),
+        createRightPlayerObject({nick: 'hena' }), // TODO
         createBallObject(),
         createGameType(gameType),
       );
