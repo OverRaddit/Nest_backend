@@ -1,96 +1,90 @@
 import { Socket } from 'socket.io';
 
 export interface GameData {
-    left: PlayerObject,
-    right: PlayerObject,
-    ball: BallObject,
-    type: GameType
+  left: PlayerObject,
+  right: PlayerObject,
+  ball: BallObject,
+  type: GameType
 };
 
 export function createGameData(
-    left: PlayerObject,
-    right: PlayerObject,
-    ball: BallObject,
-    type: GameType
-) : GameData {
-    return { left, right, ball, type };
+  left: PlayerObject,
+  right: PlayerObject,
+  ball: BallObject,
+  type: GameType,
+): GameData {
+  return { left, right, ball, type };
 }
 
 const canvasW = 600;
 const canvasH = 400;
 const moveValue = 4;
 
-
-
-export interface GameType{
-  flag: boolean
+export interface GameType {
+flag: number;
 };
 
-
-export interface BallObject{
-  x: number,
-  y: number,
-  radius: number,
-  speed : number,
-  velocityX : number,
-  velocityY : number,
+export interface BallObject {
+x: number;
+y: number;
+radius: number;
+speed: number;
+velocityX: number;
+velocityY: number;
 };
 
-export interface PlayerObject{
-  x: number,
-  y: number,
-  width : number,
-  height: number,
-  score: number,
-  state: number,
-  nick: string
+export interface PlayerObject {
+x: number;
+y: number;
+width: number;
+height: number;
+score: number;
+state: number;
+nick: string;
 };
-
 
 export function createGameType(
-  flag: boolean = false
-  ): GameType {
+flag = 0
+): GameType {
 return {flag};
 }
 
-
-
-export function createLeftPlayerObject(
-    x: number = 0,
-    y: number = canvasH / 2 - 100 / 2,
-    width : number = 10,
-    height: number = 100,
-    score: number = 0,
-    state: number = 0,
-    nick: string = ""
-    ): PlayerObject {
-  return { x, y, width, height, score, state, nick };
+export function createLeftPlayerObject({
+  x = 0,
+  y = canvasH / 2 - 100 / 2,
+  width = 10,
+  height = 100,
+  score = 0,
+  state = 0,
+  nick = '',
+}): PlayerObject {
+return { x, y, width, height, score, state, nick };
 }
 
-export function createRightPlayerObject(
-    x: number = canvasW - 10,
-    y: number = canvasH / 2 - 100 / 2,
-    width : number = 10,
-    height: number = 100,
-    score: number = 0,
-    state: number = 0,
-    nick: string = ""
-    ): PlayerObject {
-  return { x, y, width, height, score, state, nick };
+export function createRightPlayerObject({
+  x = canvasW - 10,
+  y = canvasH / 2 - 100 / 2,
+  width = 10,
+  height = 100,
+  score = 0,
+  state = 0,
+  nick = '',
+}): PlayerObject {
+return { x, y, width, height, score, state, nick };
 }
 
 export function createBallObject(
-    x: number = canvasW / 2,
-    y: number = canvasH / 2,
-    radius: number = 10,
-    speed : number = 5,
-    velocityX : number = 5,
-    velocityY : number = 5,
-    ): BallObject {
-  return { x, y, radius, speed, velocityX, velocityY };
+  x = canvasW / 2,
+  y = canvasH / 2,
+  radius = 10,
+  speed = 5,
+  velocityX = 5,
+  velocityY = 5,
+  ): BallObject {
+return { x, y, radius, speed, velocityX, velocityY };
 }
 
-export interface SocketInfo{
+export interface SocketInfo {
   roomName: string,
   playerId: number
 };
@@ -98,6 +92,7 @@ export interface SocketInfo{
 export interface QueueObject{
   socket: Socket,
   gameType: MapStatus
+  nickName: string
 };
 
 export enum ExitStatus {
