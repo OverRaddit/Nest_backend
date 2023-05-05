@@ -497,7 +497,35 @@ export class EventsGateway
   async BackClick(@ConnectedSocket() client, @MessageBody() data) {
     const [roomName, nickName] = data;
 
-    // this.server.to(roomName).emit('afk', nickName); // TODO
-    this.server.to(roomName).emit('gameover', 1); // TODO
+    const gameObject = this.gameRoom[roomName];
+    // 1p or 2p case
+    if (nickName === gameObject.left.nick || nickName === gameObject.right.nick)
+    {
+      clearInterval(this.intervalIds[roomName]);
+      delete this.intervalIds[roomName];
+
+      // socketMap clear
+      const remainClients = this.server.sockets.adapter.rooms.get(roomName);
+      for (const key of remainClients) {
+        this.socketRoomMap.delete(key);
+      }
+
+      const gameType:number     = gameObject.type.flag;
+      
+      const winner:PlayerObject = data.left.score > data.right.score ? data.left : data.right;
+      const loser:PlayerObject  = data.left.score < data.right.score ? data.left : data.right;
+      const winScore:number     = winner.score;
+      const loseScore:number    = loser.score;
+      const winId:string        = winner.nick;
+      const loserId:string      = loser.nick;
+
+      // console.log(ExitStatus.CRASH, gameType, winScore, loseScore, winId, loserId);
+
+      // remove socket room
+      delete this.gameRoom[roomName];
+      this.server.socketsLeave(roomName);
+
+      this.server.to(roomName).emit('gameover', 1); // TODO
+    }
   }
 }
