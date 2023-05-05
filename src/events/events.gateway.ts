@@ -11,7 +11,7 @@ import {
 import { randomBytes } from 'crypto';
 import { map } from 'rxjs';
 import { Server, Socket } from 'socket.io';
-import { GameData, BallObject, PlayerObject, SocketInfo, ExitStatus, MapStatus, QueueObject, createBallObject, createLeftPlayerObject, createRightPlayerObject, createGameData, createGameType } from './game.interface';
+import { GameData, BallObject, PlayerObject, SocketInfo, ExitStatus, MapStatus, QueueObject, createBallObject, createLeftPlayerObject, createRightPlayerObject, createGameData, createGameType, createQueueObject } from './game.interface';
 // 이 설정들이 뭘하는건지, 애초에 무슨 레포를 보고 이것들을 찾을 수 있는지 전혀 모르겠다.
 @WebSocketGateway(8000, {
   cors: {
@@ -296,15 +296,31 @@ export class EventsGateway
   // socket의 메시지를 room내부의 모든 이들에게 전달합니다.
   @SubscribeMessage('match')
   async enqueueMatch(@ConnectedSocket() client: Socket, @MessageBody() data) {
-    const {type, nickName} = data;
-    const queueData: QueueObject = {
-      socket: client,
-      gameType: data,
-      nickName: nickName,
-    };
+    // parameter {gametype, nickName}
+    const {gameType, nickName}: {gameType:MapStatus, nickName:string} = data;
+    console.log("my:nick", nickName);
 
-    // type에 따라 큐 넣기
-    if (data === false) {
+    // ############ Error logic ############
+    // check invalid gameType
+    if (gameType < 0 || gameType > 1)
+    {
+      this.server.to(client.id).emit('enqueuecomplete', 404);
+      return ;
+    }
+
+    // check invalid nickName
+    if (nickName === undefined || nickName === '')
+    {
+      this.server.to(client.id).emit('enqueuecomplete', 404);
+      return ;
+    }
+    // ####################################
+
+    // create QueueObject
+    const queueData: QueueObject = createQueueObject({socket:client, gameType, nickName});
+
+    // divide queue(normal, extend)
+    if (gameType === 0) {
       this.matchNormalQueue.push(queueData);
     }
     else {
@@ -313,6 +329,7 @@ export class EventsGateway
 
     this.server.to(client.id).emit('enqueuecomplete', 200);
 
+    // dequeue data
     if (this.matchNormalQueue.length >= 2 || this.matchExtendQueue.length >= 2) {
       let left;
       let right;
@@ -320,24 +337,23 @@ export class EventsGateway
       if (this.matchNormalQueue.length >= 2) {
         left = this.matchNormalQueue.shift();
         right = this.matchNormalQueue.shift();
-        gameType = false;
+        gameType = 0;
       }
 
       if (this.matchExtendQueue.length >= 2) {
         left = this.matchExtendQueue.shift();
         right = this.matchExtendQueue.shift();
-        gameType = true;
+        gameType = 1;
       }
 
       const roomName = randomBytes(10).toString('hex');
       const newGameObject: GameData =
         createGameData(
-          createLeftPlayerObject({nick: left.nick }),
-          createRightPlayerObject({nick: right.nick }),
+          createLeftPlayerObject({nick: left.nickName }),
+          createRightPlayerObject({nick: right.nickName }),
           createBallObject(),
           createGameType(gameType),
         );
-
       // nickname add part
       this.gameRoom[roomName] = newGameObject;
       left.socket.join(roomName); // TODO
@@ -348,8 +364,9 @@ export class EventsGateway
       this.socketRoomMap.set(left.socket.id, leftInfo);
       this.socketRoomMap.set(right.socket.id, rightInfo);
 
-
-      this.server.to(roomName).emit('matchingcomplete', 200, roomName);
+      // {state, message, dataObject {} }
+      const responseMessage = {state: 200, message:"good in 'match'", dataObject: {leftPlayerNick:left.nickName, rightPlayerNick:right.nickName, roomName:roomName}};
+      this.server.to(roomName).emit('matchingcomplete', responseMessage);
       this.server.to(left.socket.id).emit('isLeft', 1);
       this.server.to(right.socket.id).emit('isLeft', 2);
 
