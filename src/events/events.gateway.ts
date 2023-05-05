@@ -126,7 +126,7 @@ export class EventsGateway
       this.server.to(roomName).emit('render', gameObject.left, gameObject.right, gameObject.ball, roomName);
 
       // check GameOver and proceed over logic
-      if (this.isGameOver(gameObject.left.score, gameObject.right.score, roomName)) {
+      if (this.isGameOver(gameObject.left, gameObject.right, roomName)) {
         // stop interval and clear
         clearInterval(this.intervalIds[roomName]);
         delete this.intervalIds[roomName];
@@ -187,23 +187,32 @@ export class EventsGateway
       // only player 1 and 2 win
       if (playerId === 1 || playerId === 2) {
         let winScore, loseScore, winId, loserId;
-        const gameType = this.gameRoom[roomName].type.flag;
+        const gameObject = this.gameRoom[roomName];
         // player 2p win
         if (playerId === 1) {
-          this.server.to(roomName).emit('gameover', 2);
-          winScore = this.gameRoom[roomName].right.score;
-          loseScore = this.gameRoom[roomName].left.score;
-          winId = this.gameRoom[roomName].right.nick;
-          loserId = this.gameRoom[roomName].left.nick;
+          const winner = gameObject.right;
+          const loser = gameObject.left;
+
+          winScore = winner.score;
+          loseScore = loser.score;
+          winId = winner.nick;
+          loserId = loser.nick;
+
+          const responseMessage = {state:200, message:"Disconnect 2p Win", dataObject:{player:winner.nick}};
+          this.server.to(roomName).emit('gameover', responseMessage);
         }
         // player 1p win
         else if (playerId === 2) {
-          this.server.to(roomName).emit('gameover', 1);
+          const winner = gameObject.left;
+          const loser = gameObject.right;
+          
+          winScore = winner.score;
+          loseScore = loser.score;
+          winId = winner.nick;
+          loserId = loser.nick;
 
-          winScore = this.gameRoom[roomName].left.score;
-          loseScore = this.gameRoom[roomName].right.score;
-          winId = this.gameRoom[roomName].left.nick;
-          loserId = this.gameRoom[roomName].right.nick;
+          const responseMessage = {state:200, message:"Disconnect 1p Win", dataObject:{player:winner.nick}};
+          this.server.to(roomName).emit('gameover', responseMessage);
         }
 
         // Stop Game
@@ -219,7 +228,7 @@ export class EventsGateway
 
         // Processing Database
         // Alee's TODO
-        console.log(ExitStatus.CRASH, gameType, winScore, loseScore, winId, loserId);
+        console.log(ExitStatus.CRASH, gameObject.type.flag, winScore, loseScore, winId, loserId);
 
         // remove socket(real socket) room
         this.server.socketsLeave(roomName);
@@ -375,13 +384,15 @@ export class EventsGateway
     }
   }
 
-  isGameOver(leftScore: number, rightScore: number, roomName: string): boolean {
-    if (leftScore >= this.maxGoalScore || rightScore >= this.maxGoalScore) {
-      if (leftScore >= this.maxGoalScore) {
-        this.server.to(roomName).emit('gameover', 1); // TODO
+  isGameOver(left: PlayerObject, right: PlayerObject, roomName: string): boolean {
+    if (left.score >= this.maxGoalScore || right.score >= this.maxGoalScore) {
+      if (left.score >= this.maxGoalScore) {
+        const responseMessage = {state:200, message:"Test", dataObject:{player:left.nick}};
+        this.server.to(roomName).emit('gameover', responseMessage); // TODO
       }
-      else if (rightScore >= this.maxGoalScore) {
-        this.server.to(roomName).emit('gameover', 2); // TODO
+      else if (right.score >= this.maxGoalScore) {
+        const responseMessage = {state:200, message:"Test", dataObject:{player:right.nick}};
+        this.server.to(roomName).emit('gameover', responseMessage); // TODO
       }
       return true;
     }
@@ -521,6 +532,7 @@ export class EventsGateway
   async BackClick(@ConnectedSocket() client, @MessageBody() data) {
     const {roomName, nickName} = data;
 
+
     const gameObject = this.gameRoom[roomName];
     // 1p or 2p case
     if (nickName === gameObject.left.nick || nickName === gameObject.right.nick)
@@ -549,7 +561,8 @@ export class EventsGateway
       delete this.gameRoom[roomName];
       this.server.socketsLeave(roomName);
 
-      this.server.to(roomName).emit('gameover', winner.nick);
+      const responseMessage = {state:200, message:"Test", dataObject:{player:winner.nick}};
+      this.server.to(roomName).emit('gameover', responseMessage);
     }
   }
 }
