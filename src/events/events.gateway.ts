@@ -67,56 +67,59 @@ export class EventsGateway
       ball.velocityX = -ball.velocityX;
     }
 
+
+
     const setId = setInterval(() => {
-      const data = this.gameRoom[roomName];
+      const gameObject = this.gameRoom[roomName];
 
-      data.ball.x += data.ball.velocityX;
-      data.ball.y += data.ball.velocityY;
+      gameObject.ball.x += gameObject.ball.velocityX;
+      gameObject.ball.y += gameObject.ball.velocityY;
 
-      if (data.ball.y + data.ball.radius > this.canvasH ||
-        data.ball.y - data.ball.radius < 0) {
-        data.ball.velocityY = -data.ball.velocityY;
+
+      if (gameObject.ball.y + gameObject.ball.radius > this.canvasH ||
+        gameObject.ball.y - gameObject.ball.radius < 0) {
+        gameObject.ball.velocityY = -gameObject.ball.velocityY;
       }
-      let player = (data.ball.x < this.canvasW / 2) ? data.left : data.right;
+      let player = (gameObject.ball.x < this.canvasW / 2) ? gameObject.left : gameObject.right;
 
-      if (collision(data.ball, player)) {
-        let collidePoint = data.ball.y - (player.y + player.height / 2);
+      if (collision(gameObject.ball, player)) {
+        let collidePoint = gameObject.ball.y - (player.y + player.height / 2);
         collidePoint = collidePoint / (player.height / 2);
 
         let angleRad = collidePoint * Math.PI / 4;
-        let direction = (data.ball.x < this.canvasW / 2) ? 1 : -1;
-        data.ball.velocityX = direction * data.ball.speed * Math.cos(angleRad);
-        data.ball.velocityY = data.ball.speed * Math.sin(angleRad);
+        let direction = (gameObject.ball.x < this.canvasW / 2) ? 1 : -1;
+        gameObject.ball.velocityX = direction * gameObject.ball.speed * Math.cos(angleRad);
+        gameObject.ball.velocityY = gameObject.ball.speed * Math.sin(angleRad);
 
-        data.ball.speed += 0.1;
+        gameObject.ball.speed += 0.1;
       }
       // update paddle
-      if (data.left.state == 1) {
-        data.left.y = Math.max(data.left.y - this.moveValue, 0);
+      if (gameObject.left.state == 1) {
+        gameObject.left.y = Math.max(gameObject.left.y - this.moveValue, 0);
       }
-      else if (data.left.state == 2) {
-        data.left.y = Math.min(data.left.y + this.moveValue, this.canvasH - data.left.height);
+      else if (gameObject.left.state == 2) {
+        gameObject.left.y = Math.min(gameObject.left.y + this.moveValue, this.canvasH - gameObject.left.height);
       }
-      if (data.right.state == 1) {
-        data.right.y = Math.max(data.right.y - this.moveValue, 0);
+      if (gameObject.right.state == 1) {
+        gameObject.right.y = Math.max(gameObject.right.y - this.moveValue, 0);
       }
-      else if (data.right.state == 2) {
-        data.right.y = Math.min(data.right.y + this.moveValue, this.canvasH - data.right.height);
+      else if (gameObject.right.state == 2) {
+        gameObject.right.y = Math.min(gameObject.right.y + this.moveValue, this.canvasH - gameObject.right.height);
       }
 
       // update the score
-      if (data.ball.x - data.ball.radius < 0) {
-        data.right.score++;
-        resetBall(data.ball, this.canvasW, this.canvasH);
+      if (gameObject.ball.x - gameObject.ball.radius < 0) {
+        gameObject.right.score++;
+        resetBall(gameObject.ball, this.canvasW, this.canvasH);
       }
-      else if (data.ball.x + data.ball.radius > this.canvasW) {
-        data.left.score++;
-        resetBall(data.ball, this.canvasW, this.canvasH);
+      else if (gameObject.ball.x + gameObject.ball.radius > this.canvasW) {
+        gameObject.left.score++;
+        resetBall(gameObject.ball, this.canvasW, this.canvasH);
       }
-      this.server.to(roomName).emit('render', data.left, data.right, data.ball, roomName);
+      this.server.to(roomName).emit('render', gameObject.left, gameObject.right, gameObject.ball, roomName);
 
 
-      if (this.isGameOver(data.left.score, data.right.score, roomName)) {
+      if (this.isGameOver(gameObject.left.score, gameObject.right.score, roomName)) {
         // stop interval and clear
         clearInterval(this.intervalIds[roomName]);
         delete this.intervalIds[roomName];
@@ -130,8 +133,8 @@ export class EventsGateway
         const gameType = this.gameRoom[roomName].type.flag;
         let winScore, loseScore, winId, loserId;
 
-        const winner = data.left.score > data.right.score ? data.left : data.right;
-        const loser = data.left.score < data.right.score ? data.left : data.right;
+        const winner = gameObject.left.score > gameObject.right.score ? gameObject.left : gameObject.right;
+        const loser = gameObject.left.score < gameObject.right.score ? gameObject.left : gameObject.right;
         winScore = winner.score;
         loseScore = loser.score;
         winId = winner.nick;
