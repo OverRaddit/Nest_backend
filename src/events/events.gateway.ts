@@ -55,11 +55,15 @@ export class EventsGateway
         ballLeft < playerRight && ballTop < playerBottom;
     }
 
-    function resetBall(ball: BallObject, w: number, h: number) {
+    function resetBall(ball: BallObject, w: number, h: number): void {
+      // init ball position
       ball.x = w / 2;
       ball.y = h / 2;
 
+      // init ball default speed
       ball.speed = 5;
+
+      // reverse the original direction
       ball.velocityX = -ball.velocityX;
     }
 
