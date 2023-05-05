@@ -161,10 +161,7 @@ export class EventsGateway
   }
 
   afterInit(server: Server) {
-
-
     console.log('WebSocketGateway initialized');
-
   }
 
   // 연결된 socket이 연결될때 동작하는 함수 - OnGatewayConnection 짝궁
