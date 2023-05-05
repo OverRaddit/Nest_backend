@@ -247,12 +247,12 @@ export class EventsGateway
     @ConnectedSocket() client,
     @MessageBody() message,
   ) {
-    const [room, id] = message;
+    const {roomName, id} : {roomName:string, id: number} = message;
     if (id === 1) {
-      this.gameRoom[room].left.state = 1;
+      this.gameRoom[roomName].left.state = 1;
     }
     else if (id === 2) {
-      this.gameRoom[room].right.state = 1;
+      this.gameRoom[roomName].right.state = 1;
     }
   }
 
@@ -260,14 +260,14 @@ export class EventsGateway
   @SubscribeMessage('handleKeyPressDown')
   async handleKeyPressDown(
     @ConnectedSocket() client,
-    @MessageBody() data
+    @MessageBody() message
   ) {
-    const [room, id] = data;
+    const {roomName, id} : {roomName:string, id: number} = message;
     if (id === 1) {
-      this.gameRoom[room].left.state = 2;
+      this.gameRoom[roomName].left.state = 2;
     }
     else if (id === 2) {
-      this.gameRoom[room].right.state = 2;
+      this.gameRoom[roomName].right.state = 2;
     }
   }
 
@@ -276,7 +276,7 @@ export class EventsGateway
   async handleKeyRelUp(
     @ConnectedSocket() client,
     @MessageBody() message) {
-    const [roomName, id] = message;
+      const {roomName, id} : {roomName:string, id: number} = message;
     if (id === 1) {
       this.gameRoom[roomName].left.state = 0;
     }
@@ -291,7 +291,7 @@ export class EventsGateway
     @ConnectedSocket() client,
     @MessageBody() message,
   ) {
-    const [roomName, id] = message;
+    const {roomName, id} : {roomName:string, id: number} = message;
     if (id === 1) {
       this.gameRoom[roomName].left.state = 0;
     }
@@ -424,7 +424,7 @@ export class EventsGateway
 
   @SubscribeMessage('want observer')
   async WatchingGame(@ConnectedSocket() client, @MessageBody() data) {
-    const nickName: string = data;
+    const {nickName}: {nickName:string} = data;
     const sock: SocketInfo = this.socketRoomMap.get(nickName);
     if (sock !== undefined) {
       const roomName: string = sock.roomName;
@@ -443,7 +443,7 @@ export class EventsGateway
   private sessionMap = {};
   @SubscribeMessage('Invite Game')
   async InviteGame(@ConnectedSocket() client, @MessageBody() data) {
-    const nickName = data;
+    const {nickName} : {nickName: string} = data;
     // 1. Check if your opponent is online or offline
     const socketData = this.sessionMap[nickName];
     if (socketData === undefined) {
@@ -463,18 +463,18 @@ export class EventsGateway
 
   @SubscribeMessage('Accept invitation')
   async InviteOK(@ConnectedSocket() client, @MessageBody() data) {
-    const [nickName, enqueueFlag, gameType] = data;
+    const {oppNickName, myNickName, enqueueFlag, gameType} = data;
 
     // 1. Check if your opponent is online or offline
-    const socketData = this.sessionMap[nickName];
-
+    const socketData = this.sessionMap[oppNickName];
+    console.log(socketData);
     if (socketData === undefined) {
       this.server.to(client.id).emit('invite fail');
       return;
     }
 
     // 2. Check if your opponent is playing or spectating
-    if (socketData.state === 'ingame') {
+    if (socketData.state === 'in-game' || socketData.state === 'in-queue') { // TODO state change
       this.server.to(client.id).emit('invite fail');
       return;
     }
@@ -482,13 +482,13 @@ export class EventsGateway
     // 3-1. remove my data in WaitingQueue
     if (enqueueFlag === true) {
       for (var i = 0; i < this.matchNormalQueue.length; i++) {
-        if (this.matchNormalQueue[i].socket.nickName === nickName) {
+        if (this.matchNormalQueue[i].socket.nickName === oppNickName) {
           this.matchNormalQueue.splice(i, 1);
           break;
         }
       }
       for (var i = 0; i < this.matchNormalQueue.length; i++) {
-        if (this.matchExtendQueue[i].socket.nickName === nickName) {
+        if (this.matchExtendQueue[i].socket.nickName === oppNickName) {
           this.matchExtendQueue.splice(i, 1);
           break;
         }
@@ -518,7 +518,11 @@ export class EventsGateway
     this.socketRoomMap.set(socketData.id, rightInfo);
 
     // 3-5. both set id
-    this.server.to(roomName).emit('matchingcomplete', 200, roomName);
+    // const responseMessage = {state:200, message:"Test", dataObject:{player:winner.nick}};
+    const responseMessage = {state: 200, message:"good in 'match'", dataObject: 
+        {leftPlayerNick:myNickName, rightPlayerNick:oppNickName, roomName:roomName}
+      };
+    this.server.to(roomName).emit('matchingcomplete', 200, responseMessage);
     this.server.to(client.id).emit('isLeft', 1);
     this.server.to(socketData.id).emit('isLeft', 2);
 
