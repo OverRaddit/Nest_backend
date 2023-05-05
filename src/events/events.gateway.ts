@@ -48,16 +48,8 @@ export class EventsGateway
 
   startGame(roomName: string) {
     function collision(b: BallObject, p: PlayerObject): boolean {
-      const playerTop = p.y;
-      const playerBottom = p.y + p.height;
-      const playerLeft = p.x;
-      const playerRight = p.x + p.width;
-
-      const ballTop = b.y - b.radius;
-      const ballBottom = b.y + b.radius;
-      const ballLeft = b.x - b.radius;
-      const ballRight = b.x + b.radius;
-
+      const [playerTop, playerBottom, playerLeft, playerRight] = [p.y,            p.y + p.height, p.x,            p.x + p.width];
+      const [ballTop,   ballBottom,   ballLeft,   ballRight]   = [b.y - b.radius, b.y + b.radius, b.x - b.radius, b.x + b.radius];
 
       return ballRight > playerLeft && ballBottom > playerTop &&
         ballLeft < playerRight && ballTop < playerBottom;
