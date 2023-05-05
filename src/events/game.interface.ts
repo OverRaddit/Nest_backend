@@ -95,6 +95,14 @@ export interface QueueObject{
   nickName: string
 };
 
+export function createQueueObject({
+  socket,
+  gameType = 0,
+  nickName = '',
+}): QueueObject {
+return { socket, gameType, nickName };
+}
+
 export enum ExitStatus {
   CRASH = 0,
   GRACEFUL_SHUTDOWN = 1,
