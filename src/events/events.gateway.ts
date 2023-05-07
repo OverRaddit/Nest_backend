@@ -441,32 +441,37 @@ export class EventsGateway
 
   // sessionMap:[nick, socket]
   private sessionMap = {};
-  @SubscribeMessage('Invite Game')
+  @SubscribeMessage('invite Game')
   async InviteGame(@ConnectedSocket() client, @MessageBody() data) {
-    const {nickName} : {nickName: string} = data;
+    const {myIntraId, oppIntraId, gameType} : { myIntraId: string, oppIntraId: string, gameType: number} = data;
+    
     // 1. Check if your opponent is online or offline
-    const socketData = this.sessionMap[nickName];
+    const socketData = this.sessionMap[oppIntraId];
     if (socketData === undefined) {
-      this.server.to(client.id).emit('invite message fail');
+      const responseMessage = {state:200, message:`fail to invite because of ${oppIntraId} is offline`, dataObject:{}};
+      this.server.to(client.id).emit('invite message fail', responseMessage);
       return;
     }
 
     // 2. Check if your opponent is playing or spectating
     if (socketData.state === 'inGame') {
+      const responseMessage = {state:200, message:`fail to invite because of ${oppIntraId} is playing game`, dataObject:{}};
       this.server.to(client.id).emit('invite message fail');
       return;
     }
+
     // 3. return invite complete event
-    this.server.to(client.id).emit('invite message complete');
-    this.server.to(socketData.id).emit('invite message', client.id);
+    const responseMessage = {state:200, message:`success to invite ${oppIntraId}`, dataObject:{inviter:myIntraId , receiver: oppIntraId , gameType: gameType}};
+    this.server.to(client.id).emit('Invite message complete');
+    this.server.to(socketData.id).emit('Send invitation', responseMessage);
   }
 
   @SubscribeMessage('Accept invitation')
   async InviteOK(@ConnectedSocket() client, @MessageBody() data) {
-    const {oppNickName, myNickName, enqueueFlag, gameType} = data;
+    const {myIntraId, oppIntraId, enqueueFlag, gameType} = data;
 
     // 1. Check if your opponent is online or offline
-    const socketData = this.sessionMap[oppNickName];
+    const socketData = this.sessionMap[oppIntraId];
     console.log(socketData);
     if (socketData === undefined) {
       this.server.to(client.id).emit('invite fail');
@@ -482,13 +487,13 @@ export class EventsGateway
     // 3-1. remove my data in WaitingQueue
     if (enqueueFlag === true) {
       for (var i = 0; i < this.matchNormalQueue.length; i++) {
-        if (this.matchNormalQueue[i].socket.nickName === oppNickName) {
+        if (this.matchNormalQueue[i].socket.nickName === oppIntraId) {
           this.matchNormalQueue.splice(i, 1);
           break;
         }
       }
       for (var i = 0; i < this.matchNormalQueue.length; i++) {
-        if (this.matchExtendQueue[i].socket.nickName === oppNickName) {
+        if (this.matchExtendQueue[i].socket.nickName === oppIntraId) {
           this.matchExtendQueue.splice(i, 1);
           break;
         }
@@ -520,7 +525,7 @@ export class EventsGateway
     // 3-5. both set id
     // const responseMessage = {state:200, message:"Test", dataObject:{player:winner.nick}};
     const responseMessage = {state: 200, message:"good in 'match'", dataObject: 
-        {leftPlayerNick:myNickName, rightPlayerNick:oppNickName, roomName:roomName}
+        {leftPlayerNick:myIntraId, rightPlayerNick:oppIntraId, roomName:roomName}
       };
     this.server.to(roomName).emit('matchingcomplete', 200, responseMessage);
     this.server.to(client.id).emit('isLeft', 1);
