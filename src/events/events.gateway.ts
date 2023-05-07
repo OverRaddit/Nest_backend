@@ -506,8 +506,8 @@ export class EventsGateway
     // 3-3. create GameObject
     const newGameObject: GameData =
       createGameData(
-        createLeftPlayerObject({nick: 'alee' }),
-        createRightPlayerObject({nick: 'hena' }), // TODO
+        createLeftPlayerObject({nick: myIntraId }),
+        createRightPlayerObject({nick: oppIntraId }), // TODO
         createBallObject(),
         createGameType(gameType),
       );
