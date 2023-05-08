@@ -441,17 +441,19 @@ export class EventsGateway
 
   // sessionMap:[nick, socket]
   private sessionMap = {};
-  @SubscribeMessage('invite Game')
+  @SubscribeMessage('Invite Game')
   async InviteGame(@ConnectedSocket() client, @MessageBody() data) {
     const {myIntraId, oppIntraId, gameType} : { myIntraId: string, oppIntraId: string, gameType: number} = data;
     
     // 1. Check if your opponent is online or offline
     const socketData = this.sessionMap[oppIntraId];
+    console.log("qwer", socketData);
     if (socketData === undefined) {
       const responseMessage = {state:200, message:`fail to invite because of ${oppIntraId} is offline`, dataObject:{}};
       this.server.to(client.id).emit('invite message fail', responseMessage);
       return;
     }
+    console.log("1통과");
 
     // 2. Check if your opponent is playing or spectating
     if (socketData.state === 'inGame') {
@@ -460,10 +462,13 @@ export class EventsGateway
       return;
     }
 
+    console.log("2통과");
+
     // 3. return invite complete event
     const responseMessage = {state:200, message:`success to invite ${oppIntraId}`, dataObject:{inviter:myIntraId , receiver: oppIntraId , gameType: gameType}};
     this.server.to(client.id).emit('Invite message complete');
     this.server.to(socketData.id).emit('Send invitation', responseMessage);
+    console.log("3통과");
   }
 
   @SubscribeMessage('Accept invitation')
@@ -471,6 +476,9 @@ export class EventsGateway
     const {myIntraId, oppIntraId, enqueueFlag, gameType} = data;
 
     // 1. Check if your opponent is online or offline
+    console.log(`myIntraId: ${myIntraId}, oppIntraId: ${oppIntraId}, enqueueFlag: ${enqueueFlag}, gameType: ${gameType}`);
+
+    // console.log(this.sessionMap);
     const socketData = this.sessionMap[oppIntraId];
     console.log(socketData);
     if (socketData === undefined) {
@@ -527,7 +535,8 @@ export class EventsGateway
     const responseMessage = {state: 200, message:"good in 'match'", dataObject: 
         {leftPlayerNick:myIntraId, rightPlayerNick:oppIntraId, roomName:roomName}
       };
-    this.server.to(roomName).emit('matchingcomplete', 200, responseMessage);
+    console.log(`roomName:${roomName} , clientId:${client.id} , socketData.id${socketData.id} ` );
+    this.server.to(roomName).emit('matchingcomplete',responseMessage);
     this.server.to(client.id).emit('isLeft', 1);
     this.server.to(socketData.id).emit('isLeft', 2);
 
